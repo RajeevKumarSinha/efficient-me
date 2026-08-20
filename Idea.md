@@ -70,6 +70,7 @@ Traditional productivity tools (Todoist, TickTick, Notion) treat humans like lin
  │     └── Hourly thereafter until 'Done' is tapped on notification action button.
  │
  ├── 2. Periodic Maintenance & Chore Cadence
+ │     ├── Daily: Dishwasher cycle, trash clearance, desk wipe-down
  │     ├── Weekly: Laundry, grocery restock, weekly review
  │     ├── Monthly: Rent, utility bills, budget reconciliation
  │     ├── Quarterly (Every 3 Mo): AC filter change, deep clean, quarterly goals review
