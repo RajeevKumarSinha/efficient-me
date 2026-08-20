@@ -1,0 +1,380 @@
+import React, { useState, useEffect } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  TouchableOpacity,
+  RefreshControl,
+} from 'react-native';
+import { useThemeStore } from '../store/useThemeStore';
+import { useTaskStore } from '../store/useTaskStore';
+import { useHabitStore } from '../store/useHabitStore';
+import { useEnergyStore } from '../store/useEnergyStore';
+import { TaskCard } from '../components/TaskCard';
+import { HabitCard } from '../components/HabitCard';
+import { LowEnergyBanner } from '../components/LowEnergyBanner';
+import { EnergyCheckInModal } from '../components/EnergyCheckInModal';
+import { EnergyBadge } from '../components/EnergyBadge';
+import { notificationEngine } from '../services/notifications/notificationEngine';
+
+export const TodayScreen: React.FC = () => {
+  const { theme, isDarkMode, toggleTheme } = useThemeStore();
+  const { tasks, loadTasks } = useTaskStore();
+  const { habits, todayLogs, loadHabits } = useHabitStore();
+  const { todayCheckIn, isLowEnergyMode, loadTodayCheckIn } = useEnergyStore();
+
+  const [checkInVisible, setCheckInVisible] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+
+  useEffect(() => {
+    loadAll();
+  }, []);
+
+  const loadAll = async () => {
+    await Promise.all([loadTasks(), loadHabits(), loadTodayCheckIn()]);
+  };
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await loadAll();
+    setRefreshing(false);
+  };
+
+  const todayStr = new Date().toLocaleDateString('en-US', {
+    weekday: 'long',
+    month: 'short',
+    day: 'numeric',
+  });
+
+  // Filter tasks for today based on Low Energy Mode
+  const todayTasks = tasks.filter((t) => {
+    if (t.status === 'completed') return true;
+    if (isLowEnergyMode) {
+      // In low energy mode, prioritize Level 1 & 2 tasks
+      return t.energyLevel <= 2;
+    }
+    return true;
+  });
+
+  const pendingCount = tasks.filter((t) => t.status === 'pending').length;
+  const completedCount = tasks.filter((t) => t.status === 'completed').length;
+
+  return (
+    <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
+      {/* Header */}
+      <View style={[styles.header, { borderBottomColor: theme.colors.cardBorder }]}>
+        <View>
+          <Text style={[styles.dateSubtitle, { color: theme.colors.textMuted }]}>{todayStr}</Text>
+          <Text style={[styles.headerTitle, { color: theme.colors.textPrimary }]}>
+            Efficient Me
+          </Text>
+        </View>
+
+        <View style={styles.headerActions}>
+          <TouchableOpacity
+            style={[
+              styles.themeToggle,
+              { backgroundColor: theme.colors.cardBackground, borderColor: theme.colors.cardBorder },
+            ]}
+            onPress={toggleTheme}
+          >
+            <Text style={{ fontSize: 16 }}>{isDarkMode ? '☀️' : '🌙'}</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={theme.colors.accent} />
+        }
+      >
+        {/* Low Energy Mode Banner */}
+        <LowEnergyBanner />
+
+        {/* Energy & Mood Status Card */}
+        <TouchableOpacity
+          style={[
+            styles.energyCard,
+            {
+              backgroundColor: theme.colors.cardBackground,
+              borderColor: todayCheckIn
+                ? theme.colors.cardBorderHighlight
+                : theme.colors.energyHigh + '60',
+            },
+          ]}
+          onPress={() => {
+            notificationEngine.triggerHaptic('medium');
+            setCheckInVisible(true);
+          }}
+          activeOpacity={0.85}
+        >
+          <View style={styles.energyCardTop}>
+            <View>
+              <Text style={[styles.energyCardTitle, { color: theme.colors.textPrimary }]}>
+                {todayCheckIn ? 'Today’s Energy State' : 'Energy Check-In Pending'}
+              </Text>
+              <Text style={[styles.energyCardSubtitle, { color: theme.colors.textMuted }]}>
+                {todayCheckIn
+                  ? `Logged at ${todayCheckIn.loggedTime} • Tap to re-evaluate`
+                  : 'Tap to log your 5-second energy & adapt today’s tasks'}
+              </Text>
+            </View>
+            <View
+              style={[
+                styles.energyScorePill,
+                {
+                  backgroundColor: todayCheckIn
+                    ? theme.colors.accentLight
+                    : theme.colors.energyHighBg,
+                },
+              ]}
+            >
+              <Text
+                style={[
+                  styles.energyScorePillText,
+                  { color: todayCheckIn ? theme.colors.accent : theme.colors.energyHigh },
+                ]}
+              >
+                {todayCheckIn ? `${todayCheckIn.energyScore}/5 ⚡` : 'Log ⚡'}
+              </Text>
+            </View>
+          </View>
+
+          {todayCheckIn && todayCheckIn.tags.length > 0 && (
+            <View style={styles.tagRow}>
+              {todayCheckIn.tags.map((tag) => (
+                <View
+                  key={tag}
+                  style={[styles.tagBadge, { backgroundColor: theme.colors.cardBackgroundElevated }]}
+                >
+                  <Text style={[styles.tagText, { color: theme.colors.textSecondary }]}>
+                    {tag}
+                  </Text>
+                </View>
+              ))}
+            </View>
+          )}
+        </TouchableOpacity>
+
+        {/* Quick Stats */}
+        <View style={styles.statsRow}>
+          <View
+            style={[
+              styles.statCard,
+              { backgroundColor: theme.colors.cardBackground, borderColor: theme.colors.cardBorder },
+            ]}
+          >
+            <Text style={[styles.statNum, { color: theme.colors.accent }]}>{pendingCount}</Text>
+            <Text style={[styles.statLabel, { color: theme.colors.textMuted }]}>Tasks Due</Text>
+          </View>
+          <View
+            style={[
+              styles.statCard,
+              { backgroundColor: theme.colors.cardBackground, borderColor: theme.colors.cardBorder },
+            ]}
+          >
+            <Text style={[styles.statNum, { color: theme.colors.success }]}>{completedCount}</Text>
+            <Text style={[styles.statLabel, { color: theme.colors.textMuted }]}>Completed</Text>
+          </View>
+          <View
+            style={[
+              styles.statCard,
+              { backgroundColor: theme.colors.cardBackground, borderColor: theme.colors.cardBorder },
+            ]}
+          >
+            <Text style={[styles.statNum, { color: theme.colors.energyHigh }]}>
+              {Object.keys(todayLogs).length}/{habits.length}
+            </Text>
+            <Text style={[styles.statLabel, { color: theme.colors.textMuted }]}>Habits Done</Text>
+          </View>
+        </View>
+
+        {/* Elastic Habits Section */}
+        <View style={styles.sectionHeader}>
+          <Text style={[styles.sectionTitle, { color: theme.colors.textPrimary }]}>
+            Daily Elastic Habits
+          </Text>
+          <Text style={[styles.sectionSub, { color: theme.colors.textMuted }]}>
+            Pick Mini, Standard, or Plus based on energy
+          </Text>
+        </View>
+
+        {habits.map((habit) => (
+          <HabitCard key={habit.id} habit={habit} todayLog={todayLogs[habit.id]} />
+        ))}
+
+        {/* Tasks Section */}
+        <View style={[styles.sectionHeader, { marginTop: 14 }]}>
+          <Text style={[styles.sectionTitle, { color: theme.colors.textPrimary }]}>
+            {isLowEnergyMode ? 'Gentle Energy Tasks' : 'Priority Tasks'}
+          </Text>
+          <Text style={[styles.sectionSub, { color: theme.colors.textMuted }]}>
+            {isLowEnergyMode
+              ? 'High-intensity tasks paused for recovery'
+              : 'Sorted by energy match & priority'}
+          </Text>
+        </View>
+
+        {todayTasks.length === 0 ? (
+          <View
+            style={[
+              styles.emptyState,
+              { backgroundColor: theme.colors.cardBackground, borderColor: theme.colors.cardBorder },
+            ]}
+          >
+            <Text style={styles.emptyIcon}>🎉</Text>
+            <Text style={[styles.emptyTitle, { color: theme.colors.textPrimary }]}>
+              All tasks cleared!
+            </Text>
+            <Text style={[styles.emptySubtitle, { color: theme.colors.textMuted }]}>
+              Enjoy your free time or add a restorative activity.
+            </Text>
+          </View>
+        ) : (
+          todayTasks.map((task) => <TaskCard key={task.id} task={task} />)
+        )}
+      </ScrollView>
+
+      {/* Check-In Modal */}
+      <EnergyCheckInModal visible={checkInVisible} onClose={() => setCheckInVisible(false)} />
+    </View>
+  );
+};
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+  },
+  header: {
+    paddingTop: 54,
+    paddingHorizontal: 20,
+    paddingBottom: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderBottomWidth: 1,
+  },
+  dateSubtitle: {
+    fontSize: 12,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+  },
+  headerTitle: {
+    fontSize: 22,
+    fontWeight: '800',
+    marginTop: 2,
+  },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  themeToggle: {
+    padding: 8,
+    borderRadius: 10,
+    borderWidth: 1,
+  },
+  scrollContent: {
+    padding: 16,
+    paddingBottom: 60,
+  },
+  energyCard: {
+    padding: 16,
+    borderRadius: 16,
+    borderWidth: 1.5,
+    marginBottom: 16,
+  },
+  energyCardTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  energyCardTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  energyCardSubtitle: {
+    fontSize: 12,
+    marginTop: 2,
+  },
+  energyScorePill: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 12,
+  },
+  energyScorePillText: {
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  tagRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginTop: 10,
+  },
+  tagBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+  },
+  tagText: {
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  statsRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginBottom: 20,
+  },
+  statCard: {
+    flex: 1,
+    padding: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    alignItems: 'center',
+  },
+  statNum: {
+    fontSize: 18,
+    fontWeight: '800',
+  },
+  statLabel: {
+    fontSize: 11,
+    marginTop: 2,
+    fontWeight: '600',
+  },
+  sectionHeader: {
+    marginBottom: 10,
+  },
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  sectionSub: {
+    fontSize: 12,
+    marginTop: 2,
+  },
+  emptyState: {
+    padding: 24,
+    borderRadius: 16,
+    borderWidth: 1,
+    alignItems: 'center',
+    marginTop: 8,
+  },
+  emptyIcon: {
+    fontSize: 32,
+    marginBottom: 8,
+  },
+  emptyTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  emptySubtitle: {
+    fontSize: 13,
+    marginTop: 4,
+    textAlign: 'center',
+  },
+});
