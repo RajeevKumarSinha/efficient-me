@@ -1,0 +1,27 @@
+{
+  "expo": {
+    "name": "Efficient Me",
+    "slug": "efficient-me",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "ios": {
+      "supportsTablet": true
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#090D16"
+      }
+    },
+    "plugins": [
+      [
+        "expo-notifications",
+        {
+          "color": "#6366F1"
+        }
+      ],
+      "expo-sqlite"
+    ]
+  }
+}
