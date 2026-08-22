@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { useThemeStore } from '../store/useThemeStore';
 import { useTaskStore } from '../store/useTaskStore';
+import { useGoalStore } from '../store/useGoalStore';
 import { TaskCard } from '../components/TaskCard';
 import { EnergyLevel, Priority } from '../types';
 import { notificationEngine } from '../services/notifications/notificationEngine';
@@ -17,6 +18,7 @@ import { notificationEngine } from '../services/notifications/notificationEngine
 export const TasksScreen: React.FC = () => {
   const { theme } = useThemeStore();
   const { tasks, addTask } = useTaskStore();
+  const { goals, loadGoals } = useGoalStore();
 
   const [activeFilter, setActiveFilter] = useState<'all' | 'low' | 'med' | 'high' | 'chores'>('all');
   const [modalVisible, setModalVisible] = useState(false);
@@ -26,6 +28,7 @@ export const TasksScreen: React.FC = () => {
   const [description, setDescription] = useState('');
   const [energyLevel, setEnergyLevel] = useState<EnergyLevel>(2);
   const [priority, setPriority] = useState<Priority>('P3');
+  const [selectedGoalId, setSelectedGoalId] = useState<string | null>(null);
   const [isChore, setIsChore] = useState(false);
   const [choreCadence, setChoreCadence] = useState<'daily' | 'weekly' | 'monthly' | '3_month' | '6_month' | 'yearly'>('daily');
   const [isEscalatingBirthday, setIsEscalatingBirthday] = useState(false);
@@ -51,9 +54,14 @@ export const TasksScreen: React.FC = () => {
       priority,
       status: 'pending',
       dueDate: today,
+      goalId: selectedGoalId || undefined,
       isRecurringChore: isChore,
       choreCadence: isChore ? choreCadence : undefined,
     });
+
+    if (selectedGoalId) {
+      loadGoals();
+    }
 
     if (isEscalatingBirthday) {
       await notificationEngine.scheduleEscalatingBirthday(title.trim(), today, 'temp_id');
@@ -66,6 +74,7 @@ export const TasksScreen: React.FC = () => {
     setDescription('');
     setEnergyLevel(2);
     setPriority('P3');
+    setSelectedGoalId(null);
     setIsChore(false);
     setIsEscalatingBirthday(false);
     setModalVisible(false);
@@ -245,6 +254,75 @@ export const TasksScreen: React.FC = () => {
                   </TouchableOpacity>
                 ))}
               </View>
+
+              {/* Link to Goal / Milestone */}
+              {goals.length > 0 && (
+                <View style={{ marginTop: 12 }}>
+                  <Text style={[styles.label, { color: theme.colors.textSecondary }]}>
+                    🎯 Link to Long-Term Goal (Optional)
+                  </Text>
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 4 }}>
+                    <View style={{ flexDirection: 'row', gap: 6 }}>
+                      <TouchableOpacity
+                        style={[
+                          styles.cadenceChip,
+                          {
+                            backgroundColor:
+                              selectedGoalId === null
+                                ? theme.colors.accentLight
+                                : theme.colors.cardBackgroundElevated,
+                            borderColor:
+                              selectedGoalId === null ? theme.colors.accent : theme.colors.cardBorder,
+                          },
+                        ]}
+                        onPress={() => setSelectedGoalId(null)}
+                      >
+                        <Text
+                          style={[
+                            styles.cadenceText,
+                            {
+                              color:
+                                selectedGoalId === null
+                                  ? theme.colors.accent
+                                  : theme.colors.textSecondary,
+                            },
+                          ]}
+                        >
+                          None
+                        </Text>
+                      </TouchableOpacity>
+                      {goals.map((g) => (
+                        <TouchableOpacity
+                          key={g.id}
+                          style={[
+                            styles.cadenceChip,
+                            {
+                              backgroundColor:
+                                selectedGoalId === g.id
+                                  ? g.color + '25'
+                                  : theme.colors.cardBackgroundElevated,
+                              borderColor: selectedGoalId === g.id ? g.color : theme.colors.cardBorder,
+                            },
+                          ]}
+                          onPress={() => setSelectedGoalId(g.id)}
+                        >
+                          <Text
+                            style={[
+                              styles.cadenceText,
+                              {
+                                color: selectedGoalId === g.id ? g.color : theme.colors.textSecondary,
+                                fontWeight: selectedGoalId === g.id ? '700' : '500',
+                              },
+                            ]}
+                          >
+                            {g.icon} {g.title}
+                          </Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  </ScrollView>
+                </View>
+              )}
 
               {/* Smart Reminder Escalation */}
               <TouchableOpacity

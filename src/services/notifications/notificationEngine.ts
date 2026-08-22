@@ -240,4 +240,47 @@ export const notificationEngine = {
         break;
     }
   },
+
+  /**
+   * Register interactive notification response handlers (e.g. Done, Snooze, Defer)
+   */
+  registerResponseHandler(callbacks: {
+    onDone?: (entityId: string) => Promise<void>;
+    onDefer?: (entityId: string) => Promise<void>;
+  }): { remove: () => void } {
+    if (Platform.OS === 'web') return { remove: () => {} };
+
+    const subscription = Notifications.addNotificationResponseReceivedListener(async (response) => {
+      const actionIdentifier = response.actionIdentifier;
+      const data = response.notification.request.content.data;
+      const entityId = data?.entityId;
+
+      if (typeof entityId === 'string') {
+        if (actionIdentifier === NOTIFICATION_ACTIONS.DONE && callbacks.onDone) {
+          await callbacks.onDone(entityId);
+        } else if (actionIdentifier === NOTIFICATION_ACTIONS.LOW_ENERGY_DEFER && callbacks.onDefer) {
+          await callbacks.onDefer(entityId);
+        }
+      }
+
+      if (actionIdentifier === NOTIFICATION_ACTIONS.SNOOZE_1H) {
+        const snoozeDate = new Date(Date.now() + 60 * 60 * 1000);
+        const originalContent = response.notification.request.content;
+        await Notifications.scheduleNotificationAsync({
+          content: {
+            title: originalContent.title || 'Snoozed Alert',
+            body: originalContent.body || undefined,
+            data: originalContent.data,
+            categoryIdentifier: originalContent.categoryIdentifier || undefined,
+          },
+          trigger: {
+            type: Notifications.SchedulableTriggerInputTypes.DATE,
+            date: snoozeDate,
+          },
+        });
+      }
+    });
+
+    return subscription;
+  },
 };

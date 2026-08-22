@@ -11,30 +11,64 @@ import {
 import { initializeDatabase } from './src/database/db';
 import { notificationEngine } from './src/services/notifications/notificationEngine';
 import { useThemeStore } from './src/store/useThemeStore';
+import { useTaskStore } from './src/store/useTaskStore';
 import { TodayScreen } from './src/screens/TodayScreen';
 import { TasksScreen } from './src/screens/TasksScreen';
 import { HabitsScreen } from './src/screens/HabitsScreen';
+import { GoalsScreen } from './src/screens/GoalsScreen';
 import { AnalyticsScreen } from './src/screens/AnalyticsScreen';
+import { taskRepository } from './src/database/repositories/taskRepository';
 
-type TabType = 'today' | 'tasks' | 'habits' | 'insights';
+type TabType = 'today' | 'tasks' | 'habits' | 'goals' | 'insights';
 
 export default function App() {
   const { theme, isDarkMode } = useThemeStore();
+  const { loadTasks } = useTaskStore();
   const [activeTab, setActiveTab] = useState<TabType>('today');
   const [isReady, setIsReady] = useState(false);
 
   useEffect(() => {
+    let sub: { remove: () => void } | null = null;
+
     async function prepare() {
       try {
         await initializeDatabase();
         await notificationEngine.init();
+
+        // Register interactive notification action handlers
+        sub = notificationEngine.registerResponseHandler({
+          onDone: async (entityId) => {
+            try {
+              await taskRepository.completeTask(entityId);
+              await loadTasks();
+            } catch (e) {
+              console.warn('Failed to complete task from notification:', e);
+            }
+          },
+          onDefer: async (entityId) => {
+            try {
+              const tomorrow = new Date();
+              tomorrow.setDate(tomorrow.getDate() + 1);
+              const tomorrowStr = tomorrow.toISOString().split('T')[0];
+              await taskRepository.deferTask(entityId, tomorrowStr);
+              await loadTasks();
+            } catch (e) {
+              console.warn('Failed to defer task from notification:', e);
+            }
+          },
+        });
       } catch (e) {
         console.warn('Initialization error:', e);
       } finally {
         setIsReady(true);
       }
     }
+
     prepare();
+
+    return () => {
+      if (sub) sub.remove();
+    };
   }, []);
 
   if (!isReady) {
@@ -56,6 +90,8 @@ export default function App() {
         return <TasksScreen />;
       case 'habits':
         return <HabitsScreen />;
+      case 'goals':
+        return <GoalsScreen />;
       case 'insights':
         return <AnalyticsScreen />;
     }
@@ -65,6 +101,7 @@ export default function App() {
     { key: 'today', label: 'Today', icon: '⚡' },
     { key: 'tasks', label: 'Tasks', icon: '📋' },
     { key: 'habits', label: 'Habits', icon: '🌱' },
+    { key: 'goals', label: 'Goals', icon: '🎯' },
     { key: 'insights', label: 'Insights', icon: '📊' },
   ];
 

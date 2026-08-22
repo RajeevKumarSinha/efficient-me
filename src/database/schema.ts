@@ -101,9 +101,22 @@ CREATE TABLE IF NOT EXISTS reminder_rules (
 );
 
 CREATE INDEX IF NOT EXISTS idx_reminder_rules_active ON reminder_rules(is_active);
+
+-- 7. App Settings Key-Value Table
+CREATE TABLE IF NOT EXISTS app_settings (
+  key TEXT PRIMARY KEY,
+  value TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
 `;
 
 export const SEED_DATA_SQL = `
+-- Default Starter Goals
+INSERT OR IGNORE INTO goals (id, title, description, target_date, color, icon, status, created_at, updated_at)
+VALUES
+('seed_g1', 'Peak Energy & Deep Work Mastery', 'Build sustainable daily focus routines and prevent burnout spirals', date('now', '+90 days'), '#6366F1', '⚡', 'active', datetime('now'), datetime('now')),
+('seed_g2', 'Holistic Physical & Mental Well-being', 'Consistent hydration, morning sunlight, and evening wind-down', date('now', '+60 days'), '#10B981', '🌱', 'active', datetime('now'), datetime('now'));
+
 -- Default Starter Habits with Elastic Tiers
 INSERT OR IGNORE INTO habits (id, title, category, frequency_type, target_count, elastic_mini, elastic_standard, elastic_plus, energy_level, streak_count, best_streak, is_archived, created_at, updated_at)
 VALUES 
@@ -112,9 +125,9 @@ VALUES
 ('seed_h3', 'Mindful Evening Wind-Down', 'Mindfulness', 'daily', 1, '3 deep breaths in bed', '5 mins journal reflection', '15 mins reading + no screens', 1, 4, 12, 0, datetime('now'), datetime('now'));
 
 -- Default Periodic Chores with Smart Cadences
-INSERT OR IGNORE INTO tasks (id, title, description, energy_level, priority, status, due_date, duration_mins, is_recurring_chore, chore_cadence, created_at, updated_at)
+INSERT OR IGNORE INTO tasks (id, title, description, energy_level, priority, status, due_date, duration_mins, goal_id, is_recurring_chore, chore_cadence, created_at, updated_at)
 VALUES
-('seed_c1', 'Replace HVAC / AC Filters', 'Check and replace air filters for clean airflow', 2, 'P2', 'pending', date('now', '+14 days'), 15, 1, '3_month', datetime('now'), datetime('now')),
-('seed_c2', 'Dental Cleaning & Checkup', 'Schedule semi-annual dental examination and cleaning', 1, 'P2', 'pending', date('now', '+30 days'), 60, 1, '6_month', datetime('now'), datetime('now')),
-('seed_c3', 'Monthly Subscriptions & Budget Audit', 'Review recurring card charges and balance monthly sheets', 2, 'P2', 'pending', date('now', '+5 days'), 30, 1, 'monthly', datetime('now'), datetime('now'));
+('seed_c1', 'Replace HVAC / AC Filters', 'Check and replace air filters for clean airflow', 2, 'P2', 'pending', date('now', '+14 days'), 15, 'seed_g2', 1, '3_month', datetime('now'), datetime('now')),
+('seed_c2', 'Dental Cleaning & Checkup', 'Schedule semi-annual dental examination and cleaning', 1, 'P2', 'pending', date('now', '+30 days'), 60, 'seed_g2', 1, '6_month', datetime('now'), datetime('now')),
+('seed_c3', 'Monthly Subscriptions & Budget Audit', 'Review recurring card charges and balance monthly sheets', 2, 'P2', 'pending', date('now', '+5 days'), 30, 'seed_g1', 1, 'monthly', datetime('now'), datetime('now'));
 `;
