@@ -27,6 +27,44 @@ export const HabitCard: React.FC<HabitCardProps> = ({ habit, todayLog }) => {
     }
   };
 
+  const tierConfigs: Array<{
+    key: HabitTier;
+    icon: string;
+    label: string;
+    points: number;
+    color: string;
+    bgColor: string;
+    desc: string;
+  }> = [
+    {
+      key: 'mini',
+      icon: '🌱',
+      label: 'Mini',
+      points: 1,
+      color: theme.colors.energyLow,
+      bgColor: theme.colors.energyLowBg,
+      desc: habit.elasticMini,
+    },
+    {
+      key: 'standard',
+      icon: '⭐',
+      label: 'Standard',
+      points: 2,
+      color: theme.colors.energyMed,
+      bgColor: theme.colors.energyMedBg,
+      desc: habit.elasticStandard,
+    },
+    {
+      key: 'plus',
+      icon: '🚀',
+      label: 'Plus',
+      points: 3,
+      color: theme.colors.energyHigh,
+      bgColor: theme.colors.energyHighBg,
+      desc: habit.elasticPlus,
+    },
+  ];
+
   return (
     <View
       style={[
@@ -37,6 +75,7 @@ export const HabitCard: React.FC<HabitCardProps> = ({ habit, todayLog }) => {
         },
       ]}
     >
+      {/* Card Header: Title, Category & Streak */}
       <View style={styles.topRow}>
         <View style={styles.titleInfo}>
           <Text style={[styles.title, { color: theme.colors.textPrimary }]}>{habit.title}</Text>
@@ -50,109 +89,79 @@ export const HabitCard: React.FC<HabitCardProps> = ({ habit, todayLog }) => {
         </View>
       </View>
 
+      {/* Subheader */}
       <Text style={[styles.tierHeader, { color: theme.colors.textSecondary }]}>
         Elastic Tiers (Log how much you can do today):
       </Text>
 
+      {/* Stacked Tier Options */}
       <View style={styles.tiersContainer}>
-        {/* Mini Tier (Low Energy) */}
-        <TouchableOpacity
-          style={[
-            styles.tierButton,
-            {
-              backgroundColor:
-                activeTier === 'mini' ? theme.colors.energyLowBg : theme.colors.cardBackgroundElevated,
-              borderColor:
-                activeTier === 'mini' ? theme.colors.energyLow : theme.colors.cardBorder,
-            },
-          ]}
-          onPress={() => handleSelectTier('mini')}
-          activeOpacity={0.7}
-        >
-          <Text
-            style={[
-              styles.tierLabel,
-              { color: activeTier === 'mini' ? theme.colors.energyLow : theme.colors.textSecondary },
-            ]}
-          >
-            🌱 Mini (1⚡)
-          </Text>
-          <Text
-            style={[
-              styles.tierDesc,
-              { color: activeTier === 'mini' ? theme.colors.textPrimary : theme.colors.textMuted },
-            ]}
-            numberOfLines={2}
-          >
-            {habit.elasticMini}
-          </Text>
-        </TouchableOpacity>
+        {tierConfigs.map((t) => {
+          const isSelected = activeTier === t.key;
 
-        {/* Standard Tier */}
-        <TouchableOpacity
-          style={[
-            styles.tierButton,
-            {
-              backgroundColor:
-                activeTier === 'standard' ? theme.colors.energyMedBg : theme.colors.cardBackgroundElevated,
-              borderColor:
-                activeTier === 'standard' ? theme.colors.energyMed : theme.colors.cardBorder,
-            },
-          ]}
-          onPress={() => handleSelectTier('standard')}
-          activeOpacity={0.7}
-        >
-          <Text
-            style={[
-              styles.tierLabel,
-              { color: activeTier === 'standard' ? theme.colors.energyMed : theme.colors.textSecondary },
-            ]}
-          >
-            ⭐ Standard (2⚡)
-          </Text>
-          <Text
-            style={[
-              styles.tierDesc,
-              { color: activeTier === 'standard' ? theme.colors.textPrimary : theme.colors.textMuted },
-            ]}
-            numberOfLines={2}
-          >
-            {habit.elasticStandard}
-          </Text>
-        </TouchableOpacity>
+          return (
+            <TouchableOpacity
+              key={t.key}
+              style={[
+                styles.tierRow,
+                {
+                  backgroundColor: isSelected ? t.bgColor : theme.colors.cardBackgroundElevated,
+                  borderColor: isSelected ? t.color : theme.colors.cardBorder,
+                },
+              ]}
+              onPress={() => handleSelectTier(t.key)}
+              activeOpacity={0.7}
+            >
+              {/* Left: Icon & Tier Label */}
+              <View style={styles.tierHeaderCol}>
+                <Text style={styles.tierIcon}>{t.icon}</Text>
+                <Text
+                  style={[
+                    styles.tierLabel,
+                    { color: isSelected ? t.color : theme.colors.textPrimary },
+                  ]}
+                >
+                  {t.label}
+                </Text>
+              </View>
 
-        {/* Plus Tier (High Energy) */}
-        <TouchableOpacity
-          style={[
-            styles.tierButton,
-            {
-              backgroundColor:
-                activeTier === 'plus' ? theme.colors.energyHighBg : theme.colors.cardBackgroundElevated,
-              borderColor:
-                activeTier === 'plus' ? theme.colors.energyHigh : theme.colors.cardBorder,
-            },
-          ]}
-          onPress={() => handleSelectTier('plus')}
-          activeOpacity={0.7}
-        >
-          <Text
-            style={[
-              styles.tierLabel,
-              { color: activeTier === 'plus' ? theme.colors.energyHigh : theme.colors.textSecondary },
-            ]}
-          >
-            🚀 Plus (3⚡)
-          </Text>
-          <Text
-            style={[
-              styles.tierDesc,
-              { color: activeTier === 'plus' ? theme.colors.textPrimary : theme.colors.textMuted },
-            ]}
-            numberOfLines={2}
-          >
-            {habit.elasticPlus}
-          </Text>
-        </TouchableOpacity>
+              {/* Middle: Full readable description */}
+              <View style={styles.tierDescCol}>
+                <Text
+                  style={[
+                    styles.tierDesc,
+                    {
+                      color: isSelected ? theme.colors.textPrimary : theme.colors.textSecondary,
+                      fontWeight: isSelected ? '600' : '400',
+                    },
+                  ]}
+                >
+                  {t.desc}
+                </Text>
+              </View>
+
+              {/* Right: Energy Pill + Checkmark */}
+              <View
+                style={[
+                  styles.energyPill,
+                  {
+                    backgroundColor: isSelected ? t.color : theme.colors.cardBackground,
+                    borderColor: isSelected ? t.color : theme.colors.cardBorder,
+                  },
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.energyPillText,
+                    { color: isSelected ? '#FFFFFF' : t.color },
+                  ]}
+                >
+                  {isSelected ? '✓ ' : '+'}{t.points}⚡
+                </Text>
+              </View>
+            </TouchableOpacity>
+          );
+        })}
       </View>
     </View>
   );
@@ -197,23 +206,50 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   tiersContainer: {
-    flexDirection: 'row',
+    flexDirection: 'column',
     gap: 8,
   },
-  tierButton: {
-    flex: 1,
-    padding: 10,
-    borderRadius: 10,
+  tierRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 12,
     borderWidth: 1.5,
-    minHeight: 70,
+    minHeight: 46,
+  },
+  tierHeaderCol: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    width: 82,
+  },
+  tierIcon: {
+    fontSize: 14,
   },
   tierLabel: {
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: '700',
-    marginBottom: 4,
+  },
+  tierDescCol: {
+    flex: 1,
+    paddingRight: 8,
   },
   tierDesc: {
+    fontSize: 12,
+    lineHeight: 16,
+  },
+  energyPill: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+    borderWidth: 1,
+    minWidth: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  energyPillText: {
     fontSize: 11,
-    lineHeight: 14,
+    fontWeight: '800',
   },
 });
