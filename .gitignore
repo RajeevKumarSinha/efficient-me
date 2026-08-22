@@ -1,30 +1,113 @@
-# Logs
-logs
-*.log
+# Node & Dependencies
+node_modules/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
-# Dependencies
-node_modules/
+.pnpm-store/
+.yarn/cache
+.yarn/unplugged
+.yarn/build-state.yml
+.yarn/install-state.gz
+.pnp.*
+
+# Expo & Metro
+.expo/
+.expo-shared/
+web-build/
+.metro-health-check*
+
+# Android Native Builds
+android/build/
+android/app/build/
+android/.gradle/
+android/.cxx/
+android/local.properties
+android/*.iml
+android/app/*.iml
+android/captures/
+android/.externalNativeBuild/
+
+# iOS Native Builds
+ios/build/
+ios/Pods/
+ios/*.xcworkspace/xcuserdata
+ios/*.xcodeproj/xcuserdata
+ios/*.xcodeproj/project.xcworkspace/xcuserdata
+ios/.xcode.env.local
+
+# Build Outputs & Bundles
 dist/
 dist-ssr/
-# Environment files
+build/
+out/
+*.local
+.cache/
+.turbo/
+*.tsbuildinfo
+*.jsbundle
+*.sourcemap
+
+# Release Binaries & App Archives
+*.apk
+*.aab
+*.ipa
+
+# Keystores & Signing Certificates
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+*.keystore
+!android/app/debug.keystore
+
+# Environment & Secrets
 .env
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
-# IDE & Editor files
-.vscode/
+.env.*
+!.env.example
+*.pem
+
+# Local Databases (SQLite, WAL, Journal)
+*.sqlite
+*.sqlite3
+*.db
+*.db-journal
+*.db-shm
+*.db-wal
+
+# IDE & Editor Configurations
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
 .idea/
 *.suo
 *.ntvs*
 *.njsproj
 *.sln
 *.sw?
+*.patch
+*.diff
+
+# Testing & Code Coverage
+coverage/
+*.lcov
+.nyc_output/
+
+# Fastlane
+fastlane/report.xml
+fastlane/Preview.html
+fastlane/screenshots
+fastlane/test_output
+
+# OS Generated Files
 .DS_Store
-# Vite / Build outputs
-*.local
-.cache/
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+[dD]esktop.ini
+$RECYCLE.BIN/
