@@ -7,7 +7,10 @@ import {
   SafeAreaView,
   StatusBar,
   ActivityIndicator,
+  LogBox,
 } from 'react-native';
+
+LogBox.ignoreAllLogs();
 import { initializeDatabase } from './src/database/db';
 import { notificationEngine } from './src/services/notifications/notificationEngine';
 import { useThemeStore } from './src/store/useThemeStore';

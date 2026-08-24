@@ -88,18 +88,40 @@ export const habitRepository = {
 
   async logCompletion(habitId: string, tier: HabitTier, energyLogged: number, notes?: string): Promise<HabitLog> {
     const db = await getDatabase();
-    const id = 'log_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7);
     const today = new Date().toISOString().split('T')[0];
     const now = new Date().toISOString();
 
-    // Insert or replace habit log
+    const existingLog = await db.getFirstAsync<any>(
+      `SELECT id FROM habit_logs WHERE habit_id = ? AND completed_date = ?`,
+      [habitId, today]
+    );
+
+    if (existingLog) {
+      // Update existing log without incrementing streak again
+      await db.runAsync(
+        `UPDATE habit_logs SET tier = ?, energy_logged = ?, notes = ?, created_at = ? WHERE id = ?`,
+        [tier, energyLogged, notes || null, now, existingLog.id]
+      );
+
+      return {
+        id: existingLog.id,
+        habitId,
+        completedDate: today,
+        tier,
+        energyLogged,
+        notes,
+        createdAt: now,
+      };
+    }
+
+    // New completion for today: insert and increment streak
+    const id = 'log_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7);
     await db.runAsync(
-      `INSERT OR REPLACE INTO habit_logs (id, habit_id, completed_date, tier, energy_logged, notes, created_at)
+      `INSERT INTO habit_logs (id, habit_id, completed_date, tier, energy_logged, notes, created_at)
        VALUES (?, ?, ?, ?, ?, ?, ?)`,
       [id, habitId, today, tier, energyLogged, notes || null, now]
     );
 
-    // Increment streak
     const habit = await db.getFirstAsync<any>(`SELECT streak_count, best_streak FROM habits WHERE id = ?`, [habitId]);
     if (habit) {
       const nextStreak = (habit.streak_count || 0) + 1;
@@ -124,23 +146,78 @@ export const habitRepository = {
   async removeTodayLog(habitId: string): Promise<void> {
     const db = await getDatabase();
     const today = new Date().toISOString().split('T')[0];
-    await db.runAsync(
-      `DELETE FROM habit_logs WHERE habit_id = ? AND completed_date = ?`,
+
+    const existingLog = await db.getFirstAsync<any>(
+      `SELECT id FROM habit_logs WHERE habit_id = ? AND completed_date = ?`,
       [habitId, today]
     );
 
-    // Decrement streak safely
-    const habit = await db.getFirstAsync<any>(`SELECT streak_count FROM habits WHERE id = ?`, [habitId]);
-    if (habit && habit.streak_count > 0) {
+    if (existingLog) {
       await db.runAsync(
-        `UPDATE habits SET streak_count = ?, updated_at = ? WHERE id = ?`,
-        [habit.streak_count - 1, new Date().toISOString(), habitId]
+        `DELETE FROM habit_logs WHERE id = ?`,
+        [existingLog.id]
       );
+
+      // Decrement streak safely
+      const habit = await db.getFirstAsync<any>(`SELECT streak_count FROM habits WHERE id = ?`, [habitId]);
+      if (habit && habit.streak_count > 0) {
+        await db.runAsync(
+          `UPDATE habits SET streak_count = ?, updated_at = ? WHERE id = ?`,
+          [habit.streak_count - 1, new Date().toISOString(), habitId]
+        );
+      }
     }
   },
 
   async deleteHabit(id: string): Promise<void> {
     const db = await getDatabase();
     await db.runAsync(`DELETE FROM habits WHERE id = ?`, [id]);
+  },
+
+  async updateHabit(id: string, data: Partial<Habit>): Promise<void> {
+    const db = await getDatabase();
+    const now = new Date().toISOString();
+    const fields: string[] = [];
+    const values: any[] = [];
+
+    if (data.title !== undefined) {
+      fields.push('title = ?');
+      values.push(data.title);
+    }
+    if (data.category !== undefined) {
+      fields.push('category = ?');
+      values.push(data.category);
+    }
+    if (data.elasticMini !== undefined) {
+      fields.push('elastic_mini = ?');
+      values.push(data.elasticMini);
+    }
+    if (data.elasticStandard !== undefined) {
+      fields.push('elastic_standard = ?');
+      values.push(data.elasticStandard);
+    }
+    if (data.elasticPlus !== undefined) {
+      fields.push('elastic_plus = ?');
+      values.push(data.elasticPlus);
+    }
+    if (data.energyLevel !== undefined) {
+      fields.push('energy_level = ?');
+      values.push(data.energyLevel);
+    }
+    if (data.targetCount !== undefined) {
+      fields.push('target_count = ?');
+      values.push(data.targetCount);
+    }
+
+    fields.push('updated_at = ?');
+    values.push(now);
+    values.push(id);
+
+    if (fields.length > 1) {
+      await db.runAsync(
+        `UPDATE habits SET ${fields.join(', ')} WHERE id = ?`,
+        values
+      );
+    }
   },
 };

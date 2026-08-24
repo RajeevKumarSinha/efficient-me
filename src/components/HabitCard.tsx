@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Alert } from 'react-native';
 import { Habit, HabitLog, HabitTier } from '../types';
 import { useThemeStore } from '../store/useThemeStore';
 import { useHabitStore } from '../store/useHabitStore';
@@ -8,14 +8,35 @@ import { notificationEngine } from '../services/notifications/notificationEngine
 interface HabitCardProps {
   habit: Habit;
   todayLog?: HabitLog;
+  onOpenBreathwork?: () => void;
+  onEdit?: (habit: Habit) => void;
 }
 
-export const HabitCard: React.FC<HabitCardProps> = ({ habit, todayLog }) => {
+export const HabitCard: React.FC<HabitCardProps> = ({ habit, todayLog, onOpenBreathwork, onEdit }) => {
   const { theme } = useThemeStore();
-  const { completeHabit, uncompleteHabit } = useHabitStore();
+  const { completeHabit, uncompleteHabit, deleteHabit } = useHabitStore();
 
   const isCompletedToday = Boolean(todayLog);
   const activeTier = todayLog?.tier;
+
+  const handleDelete = () => {
+    notificationEngine.triggerHaptic('heavy');
+    Alert.alert(
+      'Delete Elastic Habit',
+      `Are you sure you want to delete "${habit.title}"? Your streak and logs will be removed.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: () => {
+            notificationEngine.triggerHaptic('success');
+            deleteHabit(habit.id);
+          },
+        },
+      ]
+    );
+  };
 
   const handleSelectTier = (tier: HabitTier) => {
     notificationEngine.triggerHaptic('success');
@@ -82,10 +103,52 @@ export const HabitCard: React.FC<HabitCardProps> = ({ habit, todayLog }) => {
           <Text style={[styles.category, { color: theme.colors.textMuted }]}>{habit.category}</Text>
         </View>
 
-        <View style={[styles.streakBadge, { backgroundColor: theme.colors.accentLight }]}>
-          <Text style={[styles.streakText, { color: theme.colors.accent }]}>
-            🔥 {habit.streakCount}d
-          </Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+          {onOpenBreathwork &&
+            (habit.category === 'Mindfulness' ||
+              habit.title.toLowerCase().includes('breath') ||
+              habit.title.toLowerCase().includes('sensory') ||
+              habit.elasticMini.toLowerCase().includes('sigh')) && (
+              <TouchableOpacity
+                style={[styles.guidedPill, { backgroundColor: theme.colors.energyLowBg, borderColor: theme.colors.energyLow }]}
+                onPress={() => {
+                  notificationEngine.triggerHaptic('light');
+                  onOpenBreathwork();
+                }}
+                activeOpacity={0.7}
+              >
+                <Text style={[styles.guidedPillText, { color: theme.colors.energyLow }]}>
+                  🫁 Guided
+                </Text>
+              </TouchableOpacity>
+            )}
+
+          <View style={[styles.streakBadge, { backgroundColor: theme.colors.accentLight }]}>
+            <Text style={[styles.streakText, { color: theme.colors.accent }]}>
+              🔥 {habit.streakCount}d
+            </Text>
+          </View>
+
+          {onEdit && (
+            <TouchableOpacity
+              onPress={() => {
+                notificationEngine.triggerHaptic('light');
+                onEdit(habit);
+              }}
+              style={styles.cardDeleteBtn}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <Text style={[styles.cardDeleteText, { fontSize: 13 }]}>✏️</Text>
+            </TouchableOpacity>
+          )}
+
+          <TouchableOpacity
+            onPress={handleDelete}
+            style={styles.cardDeleteBtn}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
+            <Text style={[styles.cardDeleteText, { color: theme.colors.textMuted }]}>✕</Text>
+          </TouchableOpacity>
         </View>
       </View>
 
@@ -251,5 +314,26 @@ const styles = StyleSheet.create({
   energyPillText: {
     fontSize: 11,
     fontWeight: '800',
+  },
+  guidedPill: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  guidedPillText: {
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  cardDeleteBtn: {
+    padding: 8,
+    minWidth: 32,
+    minHeight: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  cardDeleteText: {
+    fontSize: 13,
+    fontWeight: '700',
   },
 });

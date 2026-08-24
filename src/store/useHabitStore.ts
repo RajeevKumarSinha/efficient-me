@@ -11,6 +11,7 @@ interface HabitState {
   completeHabit: (habitId: string, tier: HabitTier, energyLogged: number, notes?: string) => Promise<void>;
   uncompleteHabit: (habitId: string) => Promise<void>;
   deleteHabit: (id: string) => Promise<void>;
+  updateHabit: (id: string, data: Partial<Habit>) => Promise<void>;
 }
 
 export const useHabitStore = create<HabitState>((set, get) => ({
@@ -51,6 +52,7 @@ export const useHabitStore = create<HabitState>((set, get) => ({
 
   completeHabit: async (habitId, tier, energyLogged, notes) => {
     try {
+      const alreadyCompletedToday = Boolean(get().todayLogs[habitId]);
       const log = await habitRepository.logCompletion(habitId, tier, energyLogged, notes);
       set((state) => ({
         todayLogs: {
@@ -61,8 +63,10 @@ export const useHabitStore = create<HabitState>((set, get) => ({
           h.id === habitId
             ? {
                 ...h,
-                streakCount: h.streakCount + 1,
-                bestStreak: Math.max(h.streakCount + 1, h.bestStreak),
+                streakCount: alreadyCompletedToday ? h.streakCount : h.streakCount + 1,
+                bestStreak: alreadyCompletedToday
+                  ? h.bestStreak
+                  : Math.max(h.streakCount + 1, h.bestStreak),
               }
             : h
         ),
@@ -74,6 +78,7 @@ export const useHabitStore = create<HabitState>((set, get) => ({
 
   uncompleteHabit: async (habitId) => {
     try {
+      const hadLogToday = Boolean(get().todayLogs[habitId]);
       await habitRepository.removeTodayLog(habitId);
       set((state) => {
         const nextLogs = { ...state.todayLogs };
@@ -81,12 +86,14 @@ export const useHabitStore = create<HabitState>((set, get) => ({
         return {
           todayLogs: nextLogs,
           habits: state.habits.map((h) =>
-            h.id === habitId ? { ...h, streakCount: Math.max(0, h.streakCount - 1) } : h
+            h.id === habitId
+              ? { ...h, streakCount: hadLogToday ? Math.max(0, h.streakCount - 1) : h.streakCount }
+              : h
           ),
         };
       });
     } catch (error) {
-      console.error('[HabitStore] Failed to remove habit log:', error);
+      console.error('[HabitStore] Failed to uncomplete habit:', error);
     }
   },
 
@@ -99,6 +106,19 @@ export const useHabitStore = create<HabitState>((set, get) => ({
       await habitRepository.deleteHabit(id);
     } catch (error) {
       console.error('[HabitStore] Failed to delete habit:', error);
+      get().loadHabits();
+    }
+  },
+
+  updateHabit: async (id, data) => {
+    set((state) => ({
+      habits: state.habits.map((h) => (h.id === id ? { ...h, ...data } : h)),
+    }));
+
+    try {
+      await habitRepository.updateHabit(id, data);
+    } catch (error) {
+      console.error('[HabitStore] Failed to update habit:', error);
       get().loadHabits();
     }
   },

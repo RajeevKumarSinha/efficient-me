@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -12,26 +12,53 @@ import { useThemeStore } from '../store/useThemeStore';
 import { useTaskStore } from '../store/useTaskStore';
 import { useGoalStore } from '../store/useGoalStore';
 import { TaskCard } from '../components/TaskCard';
-import { EnergyLevel, Priority } from '../types';
+import { FocusTimerModal } from '../components/FocusTimerModal';
+import { ScheduleOptimizerModal } from '../components/ScheduleOptimizerModal';
+import { QuickCaptureModal } from '../components/QuickCaptureModal';
+import { Task, EnergyLevel, Priority } from '../types';
 import { notificationEngine } from '../services/notifications/notificationEngine';
+import { parseNaturalLanguageTask } from '../services/ai/naturalLanguageParser';
 
 export const TasksScreen: React.FC = () => {
   const { theme } = useThemeStore();
-  const { tasks, addTask } = useTaskStore();
+  const { tasks, loadTasks, addTask, updateTask } = useTaskStore();
   const { goals, loadGoals } = useGoalStore();
+
+  useEffect(() => {
+    loadTasks();
+    loadGoals();
+  }, []);
 
   const [activeFilter, setActiveFilter] = useState<'all' | 'low' | 'med' | 'high' | 'chores'>('all');
   const [modalVisible, setModalVisible] = useState(false);
+  const [editModalVisible, setEditModalVisible] = useState(false);
+  const [editingTask, setEditingTask] = useState<Task | null>(null);
+  const [focusTimerVisible, setFocusTimerVisible] = useState(false);
+  const [optimizerVisible, setOptimizerVisible] = useState(false);
+  const [quickCaptureVisible, setQuickCaptureVisible] = useState(false);
+  const [selectedTaskForTimer, setSelectedTaskForTimer] = useState<Task | null>(null);
 
   // New task form state
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [energyLevel, setEnergyLevel] = useState<EnergyLevel>(2);
   const [priority, setPriority] = useState<Priority>('P3');
+  const [dueDate, setDueDate] = useState(new Date().toISOString().split('T')[0]);
   const [selectedGoalId, setSelectedGoalId] = useState<string | null>(null);
   const [isChore, setIsChore] = useState(false);
   const [choreCadence, setChoreCadence] = useState<'daily' | 'weekly' | 'monthly' | '3_month' | '6_month' | 'yearly'>('daily');
   const [isEscalatingBirthday, setIsEscalatingBirthday] = useState(false);
+
+  // Edit task form state
+  const [editTitle, setEditTitle] = useState('');
+  const [editDescription, setEditDescription] = useState('');
+  const [editEnergyLevel, setEditEnergyLevel] = useState<EnergyLevel>(2);
+  const [editPriority, setEditPriority] = useState<Priority>('P3');
+  const [editDueDate, setEditDueDate] = useState('');
+  const [editGoalId, setEditGoalId] = useState<string | null>(null);
+  const [editIsChore, setEditIsChore] = useState(false);
+  const [editChoreCadence, setEditChoreCadence] = useState<'daily' | 'weekly' | 'monthly' | '3_month' | '6_month' | 'yearly'>('daily');
+  const [editIsEscalatingBirthday, setEditIsEscalatingBirthday] = useState(false);
 
   const filteredTasks = tasks.filter((task) => {
     if (activeFilter === 'low') return task.energyLevel === 1;
@@ -41,32 +68,69 @@ export const TasksScreen: React.FC = () => {
     return true;
   });
 
+  const handleTitleChange = (text: string) => {
+    setTitle(text);
+    if (!text.trim()) return;
+
+    const parsed = parseNaturalLanguageTask(text);
+    const todayIso = new Date().toISOString().split('T')[0];
+
+    // If date explicitly detected or differs from default today
+    if (parsed.dueDate && (parsed.dueDate !== todayIso || parsed.detectedTags.some((t) => t.colorType === 'date'))) {
+      setDueDate(parsed.dueDate);
+    }
+    if (parsed.detectedTags.some((t) => t.colorType === 'energy')) {
+      setEnergyLevel(parsed.energyLevel);
+    }
+    if (parsed.detectedTags.some((t) => t.colorType === 'priority')) {
+      setPriority(parsed.priority);
+    }
+    if (parsed.isEscalatingBirthday) {
+      setIsEscalatingBirthday(true);
+      setEnergyLevel(1);
+      setPriority('P1');
+    }
+    if (parsed.isRecurringChore && parsed.choreCadence) {
+      setIsChore(true);
+      setChoreCadence(parsed.choreCadence);
+    }
+  };
+
   const handleCreateTask = async () => {
     if (!title.trim()) return;
 
     notificationEngine.triggerHaptic('success');
-    const today = new Date().toISOString().split('T')[0];
+    const parsed = parseNaturalLanguageTask(title);
+
+    const finalTitle = parsed.cleanTitle || title.trim();
+    const finalDueDate = dueDate.trim() || parsed.dueDate || new Date().toISOString().split('T')[0];
+    const finalEnergy = energyLevel ?? parsed.energyLevel;
+    const finalPriority = priority ?? parsed.priority;
+    const finalIsBirthday = isEscalatingBirthday || parsed.isEscalatingBirthday;
+    const finalIsChore = isChore || parsed.isRecurringChore;
+    const finalChoreCadence = (isChore ? choreCadence : parsed.choreCadence) || 'daily';
 
     await addTask({
-      title: title.trim(),
+      title: finalTitle,
       description: description.trim() || undefined,
-      energyLevel,
-      priority,
+      energyLevel: finalEnergy,
+      priority: finalPriority,
       status: 'pending',
-      dueDate: today,
+      dueDate: finalDueDate,
       goalId: selectedGoalId || undefined,
-      isRecurringChore: isChore,
-      choreCadence: isChore ? choreCadence : undefined,
+      isRecurringChore: finalIsChore,
+      choreCadence: finalIsChore ? finalChoreCadence : undefined,
+      isEscalatingBirthday: finalIsBirthday,
     });
 
     if (selectedGoalId) {
       loadGoals();
     }
 
-    if (isEscalatingBirthday) {
-      await notificationEngine.scheduleEscalatingBirthday(title.trim(), today, 'temp_id');
-    } else if (isChore) {
-      await notificationEngine.schedulePeriodicChore(title.trim(), choreCadence, 'temp_id');
+    if (finalIsBirthday) {
+      await notificationEngine.scheduleEscalatingBirthday(finalTitle, finalDueDate, 'temp_id');
+    } else if (finalIsChore) {
+      await notificationEngine.schedulePeriodicChore(finalTitle, finalChoreCadence, 'temp_id');
     }
 
     // Reset form
@@ -74,10 +138,93 @@ export const TasksScreen: React.FC = () => {
     setDescription('');
     setEnergyLevel(2);
     setPriority('P3');
+    setDueDate(new Date().toISOString().split('T')[0]);
     setSelectedGoalId(null);
     setIsChore(false);
     setIsEscalatingBirthday(false);
     setModalVisible(false);
+  };
+
+  const handleOpenEdit = (task: Task) => {
+    notificationEngine.triggerHaptic('light');
+    setEditingTask(task);
+    setEditTitle(task.title);
+    setEditDescription(task.description || '');
+    setEditEnergyLevel(task.energyLevel);
+    setEditPriority(task.priority);
+    setEditDueDate(task.dueDate || new Date().toISOString().split('T')[0]);
+    setEditGoalId(task.goalId || null);
+    setEditIsChore(Boolean(task.isRecurringChore));
+    setEditChoreCadence((task.choreCadence as any) || 'daily');
+    setEditIsEscalatingBirthday(
+      Boolean(task.isEscalatingBirthday) ||
+      /\b(birthday|bday|anniversary)\b/i.test(task.title)
+    );
+    setEditModalVisible(true);
+  };
+
+  const handleEditTitleChange = (text: string) => {
+    setEditTitle(text);
+    if (!text.trim()) return;
+
+    const parsed = parseNaturalLanguageTask(text);
+    const todayIso = new Date().toISOString().split('T')[0];
+
+    if (parsed.dueDate && (parsed.dueDate !== todayIso || parsed.detectedTags.some((t) => t.colorType === 'date'))) {
+      setEditDueDate(parsed.dueDate);
+    }
+    if (parsed.detectedTags.some((t) => t.colorType === 'energy')) {
+      setEditEnergyLevel(parsed.energyLevel);
+    }
+    if (parsed.detectedTags.some((t) => t.colorType === 'priority')) {
+      setEditPriority(parsed.priority);
+    }
+    if (parsed.isEscalatingBirthday) {
+      setEditIsEscalatingBirthday(true);
+      setEditEnergyLevel(1);
+      setEditPriority('P1');
+    }
+    if (parsed.isRecurringChore && parsed.choreCadence) {
+      setEditIsChore(true);
+      setEditChoreCadence(parsed.choreCadence);
+    }
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editingTask || !editTitle.trim()) return;
+    notificationEngine.triggerHaptic('success');
+
+    const parsed = parseNaturalLanguageTask(editTitle);
+    const finalTitle = parsed.cleanTitle || editTitle.trim();
+    const finalDueDate = editDueDate.trim() || parsed.dueDate;
+    const finalEnergy = editEnergyLevel ?? parsed.energyLevel;
+    const finalPriority = editPriority ?? parsed.priority;
+    const finalIsBirthday = editIsEscalatingBirthday || parsed.isEscalatingBirthday;
+    const finalIsChore = editIsChore || parsed.isRecurringChore;
+    const finalChoreCadence = (editIsChore ? editChoreCadence : parsed.choreCadence) || 'daily';
+
+    await updateTask(editingTask.id, {
+      title: finalTitle,
+      description: editDescription.trim() || undefined,
+      energyLevel: finalEnergy,
+      priority: finalPriority,
+      dueDate: finalDueDate || undefined,
+      goalId: editGoalId || undefined,
+      isRecurringChore: finalIsChore,
+      choreCadence: finalIsChore ? finalChoreCadence : undefined,
+      isEscalatingBirthday: finalIsBirthday,
+    });
+
+    if (finalIsBirthday && finalDueDate) {
+      await notificationEngine.scheduleEscalatingBirthday(
+        finalTitle,
+        finalDueDate,
+        editingTask.id
+      );
+    }
+
+    setEditModalVisible(false);
+    setEditingTask(null);
   };
 
   return (
@@ -91,14 +238,56 @@ export const TasksScreen: React.FC = () => {
           </Text>
         </View>
 
+        <View style={{ flexDirection: 'row', gap: 8 }}>
+          <TouchableOpacity
+            style={[styles.addBtn, { backgroundColor: theme.colors.accentLight, borderWidth: 1, borderColor: theme.colors.accent }]}
+            onPress={() => {
+              notificationEngine.triggerHaptic('light');
+              setQuickCaptureVisible(true);
+            }}
+          >
+            <Text style={[styles.addBtnText, { color: theme.colors.accent }]}>⚡ AI Add</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.addBtn, { backgroundColor: theme.colors.accent }]}
+            onPress={() => {
+              notificationEngine.triggerHaptic('light');
+              setModalVisible(true);
+            }}
+          >
+            <Text style={styles.addBtnText}>+ New</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+
+      {/* Action Tools Row */}
+      <View style={styles.toolsRow}>
         <TouchableOpacity
-          style={[styles.addBtn, { backgroundColor: theme.colors.accent }]}
+          style={[styles.toolActionBtn, { backgroundColor: theme.colors.accentLight, borderColor: theme.colors.accent }]}
           onPress={() => {
             notificationEngine.triggerHaptic('light');
-            setModalVisible(true);
+            setOptimizerVisible(true);
           }}
+          activeOpacity={0.75}
         >
-          <Text style={styles.addBtnText}>+ New</Text>
+          <Text style={[styles.toolActionBtnText, { color: theme.colors.accent }]}>
+            ⚡ Optimize Circadian Schedule
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[styles.toolActionBtn, { backgroundColor: theme.colors.cardBackground, borderColor: theme.colors.cardBorder }]}
+          onPress={() => {
+            notificationEngine.triggerHaptic('light');
+            setSelectedTaskForTimer(null);
+            setFocusTimerVisible(true);
+          }}
+          activeOpacity={0.75}
+        >
+          <Text style={[styles.toolActionBtnText, { color: theme.colors.textPrimary }]}>
+            ⏱️ Focus Timer
+          </Text>
         </TouchableOpacity>
       </View>
 
@@ -159,12 +348,27 @@ export const TasksScreen: React.FC = () => {
             </Text>
           </View>
         ) : (
-          filteredTasks.map((task) => <TaskCard key={task.id} task={task} />)
+          filteredTasks.map((task) => (
+            <TaskCard
+              key={task.id}
+              task={task}
+              onStartTimer={(t) => {
+                setSelectedTaskForTimer(t);
+                setFocusTimerVisible(true);
+              }}
+              onEdit={handleOpenEdit}
+            />
+          ))
         )}
       </ScrollView>
 
       {/* Create Task Modal */}
-      <Modal visible={modalVisible} animationType="slide" transparent>
+      <Modal
+        visible={modalVisible}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setModalVisible(false)}
+      >
         <View style={styles.modalOverlay}>
           <View
             style={[
@@ -193,11 +397,48 @@ export const TasksScreen: React.FC = () => {
                     color: theme.colors.textPrimary,
                   },
                 ]}
-                placeholder="e.g. Deep Work on Architecture or Mom's Birthday"
+                placeholder="e.g. Deep Work on Architecture or Mom's Birthday on May 18 P1"
                 placeholderTextColor={theme.colors.textMuted}
                 value={title}
-                onChangeText={setTitle}
+                onChangeText={handleTitleChange}
               />
+
+              {title.trim().length > 0 && parseNaturalLanguageTask(title).detectedTags.length > 0 && (
+                <View style={styles.detectedPillsRow}>
+                  {parseNaturalLanguageTask(title).detectedTags.map((tag, idx) => (
+                    <View
+                      key={idx}
+                      style={[
+                        styles.detectedPill,
+                        {
+                          backgroundColor:
+                            tag.colorType === 'priority' && tag.label.includes('Birthday')
+                              ? '#FDF2F8'
+                              : theme.colors.accentLight,
+                          borderColor:
+                            tag.colorType === 'priority' && tag.label.includes('Birthday')
+                              ? '#F472B6'
+                              : theme.colors.accent,
+                        },
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          styles.detectedPillText,
+                          {
+                            color:
+                              tag.colorType === 'priority' && tag.label.includes('Birthday')
+                                ? '#DB2777'
+                                : theme.colors.accent,
+                          },
+                        ]}
+                      >
+                        {tag.icon} {tag.label}
+                      </Text>
+                    </View>
+                  ))}
+                </View>
+              )}
 
               {/* Description */}
               <Text style={[styles.label, { color: theme.colors.textSecondary, marginTop: 12 }]}>
@@ -254,6 +495,25 @@ export const TasksScreen: React.FC = () => {
                   </TouchableOpacity>
                 ))}
               </View>
+
+              {/* Due Date */}
+              <Text style={[styles.label, { color: theme.colors.textSecondary, marginTop: 12 }]}>
+                📅 Due / Event Date (YYYY-MM-DD)
+              </Text>
+              <TextInput
+                style={[
+                  styles.input,
+                  {
+                    backgroundColor: theme.colors.cardBackgroundElevated,
+                    borderColor: theme.colors.cardBorder,
+                    color: theme.colors.textPrimary,
+                  },
+                ]}
+                placeholder="YYYY-MM-DD (e.g. 2026-09-18)"
+                placeholderTextColor={theme.colors.textMuted}
+                value={dueDate}
+                onChangeText={setDueDate}
+              />
 
               {/* Link to Goal / Milestone */}
               {goals.length > 0 && (
@@ -415,6 +675,371 @@ export const TasksScreen: React.FC = () => {
           </View>
         </View>
       </Modal>
+
+      {/* Edit Task Modal */}
+      <Modal
+        visible={editModalVisible}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setEditModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View
+            style={[
+              styles.modalCard,
+              { backgroundColor: theme.colors.cardBackground, borderColor: theme.colors.cardBorder },
+            ]}
+          >
+            <ScrollView showsVerticalScrollIndicator={false}>
+              <View style={styles.modalHeader}>
+                <Text style={[styles.modalTitle, { color: theme.colors.textPrimary }]}>
+                  Edit Task or Chore
+                </Text>
+                <TouchableOpacity onPress={() => setEditModalVisible(false)}>
+                  <Text style={[styles.closeText, { color: theme.colors.textMuted }]}>✕</Text>
+                </TouchableOpacity>
+              </View>
+
+              {/* Title */}
+              <Text style={[styles.label, { color: theme.colors.textSecondary }]}>Title</Text>
+              <TextInput
+                style={[
+                  styles.input,
+                  {
+                    backgroundColor: theme.colors.cardBackgroundElevated,
+                    borderColor: theme.colors.cardBorder,
+                    color: theme.colors.textPrimary,
+                  },
+                ]}
+                value={editTitle}
+                onChangeText={handleEditTitleChange}
+              />
+
+              {editTitle.trim().length > 0 && parseNaturalLanguageTask(editTitle).detectedTags.length > 0 && (
+                <View style={styles.detectedPillsRow}>
+                  {parseNaturalLanguageTask(editTitle).detectedTags.map((tag, idx) => (
+                    <View
+                      key={idx}
+                      style={[
+                        styles.detectedPill,
+                        {
+                          backgroundColor:
+                            tag.colorType === 'priority' && tag.label.includes('Birthday')
+                              ? '#FDF2F8'
+                              : theme.colors.accentLight,
+                          borderColor:
+                            tag.colorType === 'priority' && tag.label.includes('Birthday')
+                              ? '#F472B6'
+                              : theme.colors.accent,
+                        },
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          styles.detectedPillText,
+                          {
+                            color:
+                              tag.colorType === 'priority' && tag.label.includes('Birthday')
+                                ? '#DB2777'
+                                : theme.colors.accent,
+                          },
+                        ]}
+                      >
+                        {tag.icon} {tag.label}
+                      </Text>
+                    </View>
+                  ))}
+                </View>
+              )}
+
+              {/* Description */}
+              <Text style={[styles.label, { color: theme.colors.textSecondary, marginTop: 12 }]}>
+                Description (Optional)
+              </Text>
+              <TextInput
+                style={[
+                  styles.input,
+                  {
+                    backgroundColor: theme.colors.cardBackgroundElevated,
+                    borderColor: theme.colors.cardBorder,
+                    color: theme.colors.textPrimary,
+                  },
+                ]}
+                value={editDescription}
+                onChangeText={setEditDescription}
+              />
+
+              {/* Due Date */}
+              <Text style={[styles.label, { color: theme.colors.textSecondary, marginTop: 12 }]}>
+                Due Date (YYYY-MM-DD)
+              </Text>
+              <TextInput
+                style={[
+                  styles.input,
+                  {
+                    backgroundColor: theme.colors.cardBackgroundElevated,
+                    borderColor: theme.colors.cardBorder,
+                    color: theme.colors.textPrimary,
+                  },
+                ]}
+                placeholder="YYYY-MM-DD"
+                placeholderTextColor={theme.colors.textMuted}
+                value={editDueDate}
+                onChangeText={setEditDueDate}
+              />
+
+              {/* Energy Requirement */}
+              <Text style={[styles.label, { color: theme.colors.textSecondary, marginTop: 12 }]}>
+                Required Energy Level
+              </Text>
+              <View style={styles.choiceRow}>
+                {[
+                  { lvl: 1 as EnergyLevel, label: '1⚡ Low (Gentle)' },
+                  { lvl: 2 as EnergyLevel, label: '2⚡ Med (Standard)' },
+                  { lvl: 3 as EnergyLevel, label: '3⚡ High (Focus)' },
+                ].map((item) => (
+                  <TouchableOpacity
+                    key={item.lvl}
+                    style={[
+                      styles.choiceBtn,
+                      {
+                        backgroundColor:
+                          editEnergyLevel === item.lvl
+                            ? theme.colors.accentLight
+                            : theme.colors.cardBackgroundElevated,
+                        borderColor:
+                          editEnergyLevel === item.lvl ? theme.colors.accent : theme.colors.cardBorder,
+                      },
+                    ]}
+                    onPress={() => setEditEnergyLevel(item.lvl)}
+                  >
+                    <Text
+                      style={[
+                        styles.choiceBtnText,
+                        { color: editEnergyLevel === item.lvl ? theme.colors.accent : theme.colors.textSecondary },
+                      ]}
+                    >
+                      {item.label}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              {/* Priority */}
+              <Text style={[styles.label, { color: theme.colors.textSecondary, marginTop: 12 }]}>
+                Priority
+              </Text>
+              <View style={styles.choiceRow}>
+                {(['P1', 'P2', 'P3', 'P4'] as Priority[]).map((p) => (
+                  <TouchableOpacity
+                    key={p}
+                    style={[
+                      styles.choiceBtn,
+                      {
+                        backgroundColor:
+                          editPriority === p
+                            ? theme.colors.accentLight
+                            : theme.colors.cardBackgroundElevated,
+                        borderColor: editPriority === p ? theme.colors.accent : theme.colors.cardBorder,
+                      },
+                    ]}
+                    onPress={() => setEditPriority(p)}
+                  >
+                    <Text
+                      style={[
+                        styles.choiceBtnText,
+                        { color: editPriority === p ? theme.colors.accent : theme.colors.textSecondary },
+                      ]}
+                    >
+                      {p}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              {/* Link to Goal / Milestone */}
+              {goals.length > 0 && (
+                <View style={{ marginTop: 12 }}>
+                  <Text style={[styles.label, { color: theme.colors.textSecondary }]}>
+                    🎯 Link to Long-Term Goal
+                  </Text>
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 4 }}>
+                    <View style={{ flexDirection: 'row', gap: 6 }}>
+                      <TouchableOpacity
+                        style={[
+                          styles.cadenceChip,
+                          {
+                            backgroundColor:
+                              editGoalId === null
+                                ? theme.colors.accentLight
+                                : theme.colors.cardBackgroundElevated,
+                            borderColor:
+                              editGoalId === null ? theme.colors.accent : theme.colors.cardBorder,
+                          },
+                        ]}
+                        onPress={() => setEditGoalId(null)}
+                      >
+                        <Text
+                          style={[
+                            styles.cadenceText,
+                            {
+                              color:
+                                editGoalId === null
+                                  ? theme.colors.accent
+                                  : theme.colors.textSecondary,
+                            },
+                          ]}
+                        >
+                          None
+                        </Text>
+                      </TouchableOpacity>
+                      {goals.map((g) => (
+                        <TouchableOpacity
+                          key={g.id}
+                          style={[
+                            styles.cadenceChip,
+                            {
+                              backgroundColor:
+                                editGoalId === g.id
+                                  ? g.color + '25'
+                                  : theme.colors.cardBackgroundElevated,
+                              borderColor: editGoalId === g.id ? g.color : theme.colors.cardBorder,
+                            },
+                          ]}
+                          onPress={() => setEditGoalId(g.id)}
+                        >
+                          <Text
+                            style={[
+                              styles.cadenceText,
+                              {
+                                color: editGoalId === g.id ? g.color : theme.colors.textSecondary,
+                                fontWeight: editGoalId === g.id ? '700' : '500',
+                              },
+                            ]}
+                          >
+                            {g.icon} {g.title}
+                          </Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  </ScrollView>
+                </View>
+              )}
+
+              {/* Smart Reminder Escalation */}
+              <TouchableOpacity
+                style={[
+                  styles.toggleRow,
+                  {
+                    backgroundColor: theme.colors.cardBackgroundElevated,
+                    borderColor: theme.colors.cardBorder,
+                    marginTop: 10,
+                  },
+                ]}
+                onPress={() => setEditIsEscalatingBirthday(!editIsEscalatingBirthday)}
+              >
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.toggleTitle, { color: theme.colors.textPrimary }]}>
+                    🎂 Escalating Persistent Reminder
+                  </Text>
+                  <Text style={[styles.toggleDesc, { color: theme.colors.textMuted }]}>
+                    11:11 PM eve alert + 7/8/9 AM silent vibration + hourly until done
+                  </Text>
+                </View>
+                <Text style={{ fontSize: 18 }}>{editIsEscalatingBirthday ? '☑️' : '⬜'}</Text>
+              </TouchableOpacity>
+
+              {/* Periodic Chore Toggle */}
+              <TouchableOpacity
+                style={[
+                  styles.toggleRow,
+                  {
+                    backgroundColor: theme.colors.cardBackgroundElevated,
+                    borderColor: theme.colors.cardBorder,
+                    marginTop: 10,
+                  },
+                ]}
+                onPress={() => setEditIsChore(!editIsChore)}
+              >
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.toggleTitle, { color: theme.colors.textPrimary }]}>
+                    🧹 Periodic Recurring Chore
+                  </Text>
+                  <Text style={[styles.toggleDesc, { color: theme.colors.textMuted }]}>
+                    Weekly, Monthly, Quarterly, or Yearly maintenance
+                  </Text>
+                </View>
+                <Text style={{ fontSize: 18 }}>{editIsChore ? '☑️' : '⬜'}</Text>
+              </TouchableOpacity>
+
+              {editIsChore && (
+                <View style={styles.cadenceContainer}>
+                  {(['daily', 'weekly', 'monthly', '3_month', '6_month', 'yearly'] as const).map((cad) => (
+                    <TouchableOpacity
+                      key={cad}
+                      style={[
+                        styles.cadenceChip,
+                        {
+                          backgroundColor:
+                            editChoreCadence === cad
+                              ? theme.colors.accentLight
+                              : theme.colors.cardBackgroundElevated,
+                          borderColor:
+                            editChoreCadence === cad ? theme.colors.accent : theme.colors.cardBorder,
+                        },
+                      ]}
+                      onPress={() => setEditChoreCadence(cad)}
+                    >
+                      <Text
+                        style={[
+                          styles.cadenceText,
+                          {
+                            color:
+                              editChoreCadence === cad ? theme.colors.accent : theme.colors.textSecondary,
+                          },
+                        ]}
+                      >
+                        {cad.replace('_', '-')}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              )}
+
+              {/* Save Button */}
+              <TouchableOpacity
+                style={[
+                  styles.createSubmitBtn,
+                  { backgroundColor: editTitle.trim() ? theme.colors.accent : theme.colors.cardBorder },
+                ]}
+                disabled={!editTitle.trim()}
+                onPress={handleSaveEdit}
+              >
+                <Text style={styles.createSubmitText}>Save Task Changes</Text>
+              </TouchableOpacity>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Focus Sprint Timer Modal */}
+      <FocusTimerModal
+        visible={focusTimerVisible}
+        initialTask={selectedTaskForTimer}
+        onClose={() => setFocusTimerVisible(false)}
+      />
+
+      {/* Circadian Schedule Optimizer Modal */}
+      <ScheduleOptimizerModal
+        visible={optimizerVisible}
+        onClose={() => setOptimizerVisible(false)}
+      />
+
+      {/* AI Quick Capture Modal */}
+      <QuickCaptureModal
+        visible={quickCaptureVisible}
+        onClose={() => setQuickCaptureVisible(false)}
+      />
     </View>
   );
 };
@@ -422,6 +1047,25 @@ export const TasksScreen: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+  },
+  toolsRow: {
+    flexDirection: 'row',
+    paddingHorizontal: 16,
+    paddingTop: 10,
+    gap: 8,
+  },
+  toolActionBtn: {
+    flex: 1,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  toolActionBtnText: {
+    fontSize: 12,
+    fontWeight: '700',
   },
   header: {
     paddingTop: 54,
@@ -571,6 +1215,24 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '600',
     textTransform: 'capitalize',
+  },
+  detectedPillsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginTop: 8,
+  },
+  detectedPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+    borderWidth: 1,
+  },
+  detectedPillText: {
+    fontSize: 11,
+    fontWeight: '600',
   },
   createSubmitBtn: {
     marginTop: 24,

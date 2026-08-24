@@ -13,6 +13,7 @@ CREATE TABLE IF NOT EXISTS tasks (
   goal_id TEXT,
   is_recurring_chore INTEGER NOT NULL DEFAULT 0,
   chore_cadence TEXT,                      -- weekly, monthly, 3_month, 6_month, yearly
+  is_escalating_birthday INTEGER NOT NULL DEFAULT 0,
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL,
   completed_at TEXT

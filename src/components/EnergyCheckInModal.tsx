@@ -63,7 +63,7 @@ export const EnergyCheckInModal: React.FC<EnergyCheckInModalProps> = ({ visible,
   const moodEmojis = ['😣 Rough', '😕 Down', '😐 Okay', '🙂 Good', '✨ Fantastic'];
 
   return (
-    <Modal visible={visible} animationType="slide" transparent>
+    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
       <View style={styles.overlay}>
         <View
           style={[
@@ -76,7 +76,11 @@ export const EnergyCheckInModal: React.FC<EnergyCheckInModalProps> = ({ visible,
               <Text style={[styles.title, { color: theme.colors.textPrimary }]}>
                 Daily Energy & Mood Check-In
               </Text>
-              <TouchableOpacity onPress={onClose}>
+              <TouchableOpacity
+                onPress={onClose}
+                hitSlop={{ top: 16, bottom: 16, left: 16, right: 16 }}
+                activeOpacity={0.7}
+              >
                 <Text style={[styles.closeText, { color: theme.colors.textMuted }]}>✕</Text>
               </TouchableOpacity>
             </View>

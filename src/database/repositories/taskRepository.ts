@@ -15,6 +15,7 @@ function rowToTask(row: any): Task {
     goalId: row.goal_id || undefined,
     isRecurringChore: Boolean(row.is_recurring_chore),
     choreCadence: row.chore_cadence || undefined,
+    isEscalatingBirthday: Boolean(row.is_escalating_birthday),
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     completedAt: row.completed_at || undefined,
@@ -73,8 +74,8 @@ export const taskRepository = {
       `INSERT INTO tasks (
         id, title, description, energy_level, priority, status, 
         due_date, due_time, duration_mins, goal_id, is_recurring_chore, 
-        chore_cadence, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        chore_cadence, is_escalating_birthday, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         id,
         data.title,
@@ -88,6 +89,7 @@ export const taskRepository = {
         data.goalId || null,
         data.isRecurringChore ? 1 : 0,
         data.choreCadence || null,
+        data.isEscalatingBirthday ? 1 : 0,
         now,
         now,
       ]
@@ -135,5 +137,72 @@ export const taskRepository = {
   async deleteTask(id: string): Promise<void> {
     const db = await getDatabase();
     await db.runAsync(`DELETE FROM tasks WHERE id = ?`, [id]);
+  },
+
+  async updateTask(id: string, data: Partial<Task>): Promise<void> {
+    const db = await getDatabase();
+    const now = new Date().toISOString();
+    const fields: string[] = [];
+    const values: any[] = [];
+
+    if (data.title !== undefined) {
+      fields.push('title = ?');
+      values.push(data.title);
+    }
+    if (data.description !== undefined) {
+      fields.push('description = ?');
+      values.push(data.description);
+    }
+    if (data.energyLevel !== undefined) {
+      fields.push('energy_level = ?');
+      values.push(data.energyLevel);
+    }
+    if (data.priority !== undefined) {
+      fields.push('priority = ?');
+      values.push(data.priority);
+    }
+    if (data.status !== undefined) {
+      fields.push('status = ?');
+      values.push(data.status);
+    }
+    if (data.dueDate !== undefined) {
+      fields.push('due_date = ?');
+      values.push(data.dueDate);
+    }
+    if (data.dueTime !== undefined) {
+      fields.push('due_time = ?');
+      values.push(data.dueTime);
+    }
+    if (data.durationMins !== undefined) {
+      fields.push('duration_mins = ?');
+      values.push(data.durationMins);
+    }
+    if (data.goalId !== undefined) {
+      fields.push('goal_id = ?');
+      values.push(data.goalId);
+    }
+    if (data.isRecurringChore !== undefined) {
+      fields.push('is_recurring_chore = ?');
+      values.push(data.isRecurringChore ? 1 : 0);
+    }
+    if (data.choreCadence !== undefined) {
+      fields.push('chore_cadence = ?');
+      values.push(data.choreCadence);
+    }
+    if (data.isEscalatingBirthday !== undefined) {
+      fields.push('is_escalating_birthday = ?');
+      values.push(data.isEscalatingBirthday ? 1 : 0);
+    }
+
+    fields.push('updated_at = ?');
+    values.push(now);
+    values.push(id);
+
+    if (fields.length > 1) {
+      await db.runAsync(
+        `UPDATE tasks SET ${fields.join(', ')} WHERE id = ?`,
+        values
+      );
+    }
   },
 };

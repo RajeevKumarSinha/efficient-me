@@ -22,6 +22,8 @@ import {
 } from '../services/chronotype/chronotypeService';
 import { ChronotypeQuizModal } from '../components/ChronotypeQuizModal';
 import { RoutineMarketplaceModal } from '../components/RoutineMarketplaceModal';
+import { WeeklyRetroModal } from '../components/WeeklyRetroModal';
+import { BackupRestoreModal } from '../components/BackupRestoreModal';
 
 export const AnalyticsScreen: React.FC = () => {
   const { theme } = useThemeStore();
@@ -35,14 +37,20 @@ export const AnalyticsScreen: React.FC = () => {
   );
   const [quizVisible, setQuizVisible] = useState(false);
   const [marketplaceVisible, setMarketplaceVisible] = useState(false);
+  const [retroVisible, setRetroVisible] = useState(false);
+  const [backupModalVisible, setBackupModalVisible] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
 
   useEffect(() => {
-    async function loadChronotype() {
+    async function loadData() {
       const type = await chronotypeService.getUserChronotype();
       setChronotypeProfile(chronotypeService.getProfile(type));
+      loadTodayCheckIn();
+      loadTasks();
+      loadHabits();
+      loadGoals();
     }
-    loadChronotype();
+    loadData();
   }, []);
 
   const completedTasks = tasks.filter((t) => t.status === 'completed').length;
@@ -139,6 +147,35 @@ export const AnalyticsScreen: React.FC = () => {
             </View>
           </View>
           <Text style={[styles.bannerArrow, { color: theme.colors.accent }]}>➔</Text>
+        </TouchableOpacity>
+
+        {/* Automated Review / Retrospective Card */}
+        <TouchableOpacity
+          style={[
+            styles.retroBanner,
+            {
+              backgroundColor: theme.colors.energyMedBg,
+              borderColor: theme.colors.energyMed,
+            },
+          ]}
+          onPress={() => {
+            notificationEngine.triggerHaptic('light');
+            setRetroVisible(true);
+          }}
+          activeOpacity={0.8}
+        >
+          <View style={styles.bannerLeft}>
+            <Text style={styles.bannerIcon}>📊</Text>
+            <View>
+              <Text style={[styles.bannerTitle, { color: theme.colors.energyMed }]}>
+                Weekly & Monthly Reviews
+              </Text>
+              <Text style={[styles.bannerSub, { color: theme.colors.textSecondary }]}>
+                Automated energy vs. productivity retro & streak protection breakdown
+              </Text>
+            </View>
+          </View>
+          <Text style={[styles.bannerArrow, { color: theme.colors.energyMed }]}>➔</Text>
         </TouchableOpacity>
 
         {/* Burnout Radar / Recovery Card */}
@@ -260,7 +297,7 @@ export const AnalyticsScreen: React.FC = () => {
           ))}
         </View>
 
-        {/* Data Sovereignty & Portability */}
+        {/* Data Sovereignty & Encrypted Portability */}
         <View
           style={[
             styles.card,
@@ -271,8 +308,25 @@ export const AnalyticsScreen: React.FC = () => {
             💾 100% Offline-First Data Sovereignty
           </Text>
           <Text style={[styles.cardDesc, { color: theme.colors.textSecondary }]}>
-            All tasks, elastic habit logs, and energy ratings reside solely in your local sandboxed SQLite database. No telemetry, zero tracking.
+            All tasks, elastic habit logs, and energy ratings reside solely in your local sandboxed SQLite database. Complete zero-knowledge portability.
           </Text>
+
+          {/* Encrypted Backup Primary Button */}
+          <TouchableOpacity
+            style={[
+              styles.encryptedBackupBtn,
+              { backgroundColor: theme.colors.accentLight, borderColor: theme.colors.accent },
+            ]}
+            onPress={() => {
+              notificationEngine.triggerHaptic('light');
+              setBackupModalVisible(true);
+            }}
+            activeOpacity={0.8}
+          >
+            <Text style={[styles.encryptedBackupBtnText, { color: theme.colors.accent }]}>
+              🔒 Encrypted Backup & Restore Manager
+            </Text>
+          </TouchableOpacity>
 
           <View style={styles.exportRow}>
             <TouchableOpacity
@@ -286,15 +340,15 @@ export const AnalyticsScreen: React.FC = () => {
             </TouchableOpacity>
 
             <TouchableOpacity
-              style={[styles.exportBtn, { backgroundColor: theme.colors.accentLight, borderColor: theme.colors.accent }]}
+              style={[styles.exportBtn, { backgroundColor: theme.colors.cardBackgroundElevated, borderColor: theme.colors.cardBorder }]}
               onPress={handleExportJSON}
               disabled={isExporting}
             >
               {isExporting ? (
                 <ActivityIndicator size="small" color={theme.colors.accent} />
               ) : (
-                <Text style={[styles.exportBtnText, { color: theme.colors.accent }]}>
-                  📦 Full Backup (JSON)
+                <Text style={[styles.exportBtnText, { color: theme.colors.textPrimary }]}>
+                  📦 Raw JSON
                 </Text>
               )}
             </TouchableOpacity>
@@ -313,6 +367,18 @@ export const AnalyticsScreen: React.FC = () => {
       <RoutineMarketplaceModal
         visible={marketplaceVisible}
         onClose={() => setMarketplaceVisible(false)}
+      />
+
+      {/* Weekly & Monthly Retro Modal */}
+      <WeeklyRetroModal
+        visible={retroVisible}
+        onClose={() => setRetroVisible(false)}
+      />
+
+      {/* Encrypted Backup & Restore Modal */}
+      <BackupRestoreModal
+        visible={backupModalVisible}
+        onClose={() => setBackupModalVisible(false)}
       />
     </View>
   );
@@ -342,6 +408,14 @@ const styles = StyleSheet.create({
     gap: 14,
   },
   marketplaceBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 14,
+    borderRadius: 14,
+    borderWidth: 1.5,
+  },
+  retroBanner: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
@@ -462,21 +536,33 @@ const styles = StyleSheet.create({
     marginTop: 2,
     lineHeight: 15,
   },
+  encryptedBackupBtn: {
+    marginTop: 12,
+    paddingVertical: 12,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  encryptedBackupBtnText: {
+    fontSize: 13,
+    fontWeight: '800',
+  },
   exportRow: {
     flexDirection: 'row',
     gap: 10,
-    marginTop: 14,
+    marginTop: 10,
   },
   exportBtn: {
     flex: 1,
-    paddingVertical: 12,
-    borderRadius: 12,
+    paddingVertical: 10,
+    borderRadius: 10,
     borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
   },
   exportBtnText: {
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '700',
   },
 });

@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { useThemeStore } from '../store/useThemeStore';
 import { useGoalStore } from '../store/useGoalStore';
+import { Goal } from '../types';
 import { notificationEngine } from '../services/notifications/notificationEngine';
 
 const GOAL_COLORS = ['#6366F1', '#10B981', '#F59E0B', '#EC4899', '#3B82F6', '#8B5CF6'];
@@ -18,9 +19,10 @@ const GOAL_ICONS = ['🎯', '⚡', '🌱', '🚀', '🧠', '💼', '🏆', '📚
 
 export const GoalsScreen: React.FC = () => {
   const { theme } = useThemeStore();
-  const { goals, loadGoals, addGoal, deleteGoal } = useGoalStore();
+  const { goals, loadGoals, addGoal, updateGoal, deleteGoal } = useGoalStore();
 
   const [modalVisible, setModalVisible] = useState(false);
+  const [editingGoalId, setEditingGoalId] = useState<string | null>(null);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [targetDate, setTargetDate] = useState('');
@@ -31,19 +33,53 @@ export const GoalsScreen: React.FC = () => {
     loadGoals();
   }, []);
 
-  const handleCreateGoal = async () => {
+  const openCreateModal = () => {
+    notificationEngine.triggerHaptic('light');
+    setEditingGoalId(null);
+    setTitle('');
+    setDescription('');
+    setTargetDate('');
+    setSelectedColor(GOAL_COLORS[0]);
+    setSelectedIcon(GOAL_ICONS[0]);
+    setModalVisible(true);
+  };
+
+  const openEditModal = (goal: Goal) => {
+    notificationEngine.triggerHaptic('light');
+    setEditingGoalId(goal.id);
+    setTitle(goal.title);
+    setDescription(goal.description || '');
+    setTargetDate(goal.targetDate || '');
+    setSelectedColor(goal.color || GOAL_COLORS[0]);
+    setSelectedIcon(goal.icon || GOAL_ICONS[0]);
+    setModalVisible(true);
+  };
+
+  const handleSaveGoal = async () => {
     if (!title.trim()) return;
 
     notificationEngine.triggerHaptic('success');
-    await addGoal({
-      title: title.trim(),
-      description: description.trim() || undefined,
-      targetDate: targetDate.trim() || undefined,
-      color: selectedColor,
-      icon: selectedIcon,
-      status: 'active',
-    });
 
+    if (editingGoalId) {
+      await updateGoal(editingGoalId, {
+        title: title.trim(),
+        description: description.trim() || undefined,
+        targetDate: targetDate.trim() || undefined,
+        color: selectedColor,
+        icon: selectedIcon,
+      });
+    } else {
+      await addGoal({
+        title: title.trim(),
+        description: description.trim() || undefined,
+        targetDate: targetDate.trim() || undefined,
+        color: selectedColor,
+        icon: selectedIcon,
+        status: 'active',
+      });
+    }
+
+    setEditingGoalId(null);
     setTitle('');
     setDescription('');
     setTargetDate('');
@@ -81,10 +117,8 @@ export const GoalsScreen: React.FC = () => {
 
         <TouchableOpacity
           style={[styles.addBtn, { backgroundColor: theme.colors.accent }]}
-          onPress={() => {
-            notificationEngine.triggerHaptic('light');
-            setModalVisible(true);
-          }}
+          onPress={openCreateModal}
+          activeOpacity={0.8}
         >
           <Text style={styles.addBtnText}>+ Goal</Text>
         </TouchableOpacity>
@@ -107,7 +141,8 @@ export const GoalsScreen: React.FC = () => {
             </Text>
             <TouchableOpacity
               style={[styles.emptyCta, { backgroundColor: theme.colors.accent }]}
-              onPress={() => setModalVisible(true)}
+              onPress={openCreateModal}
+              activeOpacity={0.8}
             >
               <Text style={styles.emptyCtaText}>+ Create Your First Goal</Text>
             </TouchableOpacity>
@@ -140,12 +175,23 @@ export const GoalsScreen: React.FC = () => {
                   )}
                 </View>
 
-                <TouchableOpacity
-                  onPress={() => handleDeleteGoal(goal.id, goal.title)}
-                  style={styles.deleteBtn}
-                >
-                  <Text style={[styles.deleteBtnText, { color: theme.colors.textMuted }]}>🗑️</Text>
-                </TouchableOpacity>
+                <View style={styles.goalActions}>
+                  <TouchableOpacity
+                    onPress={() => openEditModal(goal)}
+                    style={styles.actionBtn}
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  >
+                    <Text style={[styles.actionBtnText, { color: theme.colors.accent }]}>✏️</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    onPress={() => handleDeleteGoal(goal.id, goal.title)}
+                    style={styles.actionBtn}
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  >
+                    <Text style={[styles.actionBtnText, { color: theme.colors.textMuted }]}>🗑️</Text>
+                  </TouchableOpacity>
+                </View>
               </View>
 
               {goal.description && (
@@ -179,8 +225,8 @@ export const GoalsScreen: React.FC = () => {
         )}
       </ScrollView>
 
-      {/* Create Goal Modal */}
-      <Modal visible={modalVisible} animationType="slide" transparent>
+      {/* Create / Edit Goal Modal */}
+      <Modal visible={modalVisible} animationType="slide" transparent onRequestClose={() => setModalVisible(false)}>
         <View style={styles.modalOverlay}>
           <View
             style={[
@@ -191,9 +237,9 @@ export const GoalsScreen: React.FC = () => {
             <ScrollView showsVerticalScrollIndicator={false}>
               <View style={styles.modalHeader}>
                 <Text style={[styles.modalTitle, { color: theme.colors.textPrimary }]}>
-                  Create Long-Term Goal (OKR)
+                  {editingGoalId ? 'Edit Goal (OKR)' : 'Create Long-Term Goal (OKR)'}
                 </Text>
-                <TouchableOpacity onPress={() => setModalVisible(false)}>
+                <TouchableOpacity onPress={() => setModalVisible(false)} activeOpacity={0.7}>
                   <Text style={[styles.closeText, { color: theme.colors.textMuted }]}>✕</Text>
                 </TouchableOpacity>
               </View>
@@ -300,9 +346,12 @@ export const GoalsScreen: React.FC = () => {
 
               <TouchableOpacity
                 style={[styles.saveBtn, { backgroundColor: selectedColor }]}
-                onPress={handleCreateGoal}
+                onPress={handleSaveGoal}
+                activeOpacity={0.85}
               >
-                <Text style={styles.saveBtnText}>Create Goal</Text>
+                <Text style={styles.saveBtnText}>
+                  {editingGoalId ? 'Save Changes' : 'Create Goal'}
+                </Text>
               </TouchableOpacity>
             </ScrollView>
           </View>
@@ -379,11 +428,16 @@ const styles = StyleSheet.create({
     fontSize: 11,
     marginTop: 2,
   },
-  deleteBtn: {
-    padding: 6,
+  goalActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
-  deleteBtnText: {
-    fontSize: 16,
+  actionBtn: {
+    padding: 4,
+  },
+  actionBtnText: {
+    fontSize: 15,
   },
   goalDesc: {
     fontSize: 13,

@@ -6,6 +6,7 @@ import {
   ScrollView,
   TouchableOpacity,
   RefreshControl,
+  Image,
 } from 'react-native';
 import { useThemeStore } from '../store/useThemeStore';
 import { useTaskStore } from '../store/useTaskStore';
@@ -15,8 +16,13 @@ import { TaskCard } from '../components/TaskCard';
 import { HabitCard } from '../components/HabitCard';
 import { LowEnergyBanner } from '../components/LowEnergyBanner';
 import { EnergyCheckInModal } from '../components/EnergyCheckInModal';
-import { EnergyBadge } from '../components/EnergyBadge';
+import { SomaticPacerModal } from '../components/SomaticPacerModal';
+import { FocusTimerModal } from '../components/FocusTimerModal';
+import { ScheduleOptimizerModal } from '../components/ScheduleOptimizerModal';
+import { QuickCaptureModal } from '../components/QuickCaptureModal';
 import { notificationEngine } from '../services/notifications/notificationEngine';
+
+import { Task } from '../types';
 
 export const TodayScreen: React.FC = () => {
   const { theme, isDarkMode, toggleTheme } = useThemeStore();
@@ -25,6 +31,11 @@ export const TodayScreen: React.FC = () => {
   const { todayCheckIn, isLowEnergyMode, loadTodayCheckIn } = useEnergyStore();
 
   const [checkInVisible, setCheckInVisible] = useState(false);
+  const [pacerVisible, setPacerVisible] = useState(false);
+  const [focusTimerVisible, setFocusTimerVisible] = useState(false);
+  const [selectedTaskForTimer, setSelectedTaskForTimer] = useState<Task | null>(null);
+  const [optimizerVisible, setOptimizerVisible] = useState(false);
+  const [quickCaptureVisible, setQuickCaptureVisible] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
@@ -47,9 +58,21 @@ export const TodayScreen: React.FC = () => {
     day: 'numeric',
   });
 
-  // Filter tasks for today based on Low Energy Mode
+  const todayIso = new Date().toISOString().split('T')[0];
+
+  // Filter tasks for today based on due date and Low Energy Mode
   const todayTasks = tasks.filter((t) => {
-    if (t.status === 'completed') return true;
+    // If task is scheduled for a future date, do not show in Today view
+    if (t.dueDate && t.dueDate > todayIso && t.status !== 'completed') {
+      return false;
+    }
+    if (t.status === 'completed') {
+      // Show tasks completed today or tasks that were due today
+      if (t.completedAt && !t.completedAt.startsWith(todayIso)) {
+        return false;
+      }
+      return true;
+    }
     if (isLowEnergyMode) {
       // In low energy mode, prioritize Level 1 & 2 tasks
       return t.energyLevel <= 2;
@@ -57,21 +80,42 @@ export const TodayScreen: React.FC = () => {
     return true;
   });
 
-  const pendingCount = tasks.filter((t) => t.status === 'pending').length;
-  const completedCount = tasks.filter((t) => t.status === 'completed').length;
+  const pendingCount = todayTasks.filter((t) => t.status === 'pending').length;
+  const completedCount = todayTasks.filter((t) => t.status === 'completed').length;
 
   return (
     <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
       {/* Header */}
       <View style={[styles.header, { borderBottomColor: theme.colors.cardBorder }]}>
-        <View>
-          <Text style={[styles.dateSubtitle, { color: theme.colors.textMuted }]}>{todayStr}</Text>
-          <Text style={[styles.headerTitle, { color: theme.colors.textPrimary }]}>
-            Efficient Me
-          </Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+          <Image
+            source={require('../../assets/logo.png')}
+            style={styles.headerLogo}
+            resizeMode="contain"
+          />
+          <View>
+            <Text style={[styles.dateSubtitle, { color: theme.colors.textMuted }]}>{todayStr}</Text>
+            <Text style={[styles.headerTitle, { color: theme.colors.textPrimary }]}>
+              Efficient Me
+            </Text>
+          </View>
         </View>
 
         <View style={styles.headerActions}>
+          <TouchableOpacity
+            style={[
+              styles.quickAddBtn,
+              { backgroundColor: theme.colors.accent },
+            ]}
+            onPress={() => {
+              notificationEngine.triggerHaptic('light');
+              setQuickCaptureVisible(true);
+            }}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.quickAddBtnText}>+ Quick Add</Text>
+          </TouchableOpacity>
+
           <TouchableOpacity
             style={[
               styles.themeToggle,
@@ -159,6 +203,60 @@ export const TodayScreen: React.FC = () => {
           )}
         </TouchableOpacity>
 
+        {/* Somatic & Focus Toolbelt */}
+        <View style={styles.toolbeltRow}>
+          <TouchableOpacity
+            style={[
+              styles.toolChip,
+              { backgroundColor: theme.colors.cardBackground, borderColor: theme.colors.cardBorder },
+            ]}
+            onPress={() => {
+              notificationEngine.triggerHaptic('light');
+              setPacerVisible(true);
+            }}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.toolIcon}>🫁</Text>
+            <Text style={[styles.toolLabel, { color: theme.colors.textPrimary }]}>
+              Somatic Reset
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[
+              styles.toolChip,
+              { backgroundColor: theme.colors.cardBackground, borderColor: theme.colors.cardBorder },
+            ]}
+            onPress={() => {
+              notificationEngine.triggerHaptic('light');
+              setFocusTimerVisible(true);
+            }}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.toolIcon}>⏱️</Text>
+            <Text style={[styles.toolLabel, { color: theme.colors.textPrimary }]}>
+              Focus Sprint
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[
+              styles.toolChip,
+              { backgroundColor: theme.colors.accentLight, borderColor: theme.colors.accent },
+            ]}
+            onPress={() => {
+              notificationEngine.triggerHaptic('light');
+              setOptimizerVisible(true);
+            }}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.toolIcon}>⚡</Text>
+            <Text style={[styles.toolLabel, { color: theme.colors.accent }]}>
+              Optimize Day
+            </Text>
+          </TouchableOpacity>
+        </View>
+
         {/* Quick Stats */}
         <View style={styles.statsRow}>
           <View
@@ -203,7 +301,12 @@ export const TodayScreen: React.FC = () => {
         </View>
 
         {habits.map((habit) => (
-          <HabitCard key={habit.id} habit={habit} todayLog={todayLogs[habit.id]} />
+          <HabitCard
+            key={habit.id}
+            habit={habit}
+            todayLog={todayLogs[habit.id]}
+            onOpenBreathwork={() => setPacerVisible(true)}
+          />
         ))}
 
         {/* Tasks Section */}
@@ -234,12 +337,46 @@ export const TodayScreen: React.FC = () => {
             </Text>
           </View>
         ) : (
-          todayTasks.map((task) => <TaskCard key={task.id} task={task} />)
+          todayTasks.map((task) => (
+            <TaskCard
+              key={task.id}
+              task={task}
+              onStartTimer={(t) => {
+                setSelectedTaskForTimer(t);
+                setFocusTimerVisible(true);
+              }}
+            />
+          ))
         )}
       </ScrollView>
 
       {/* Check-In Modal */}
       <EnergyCheckInModal visible={checkInVisible} onClose={() => setCheckInVisible(false)} />
+
+      {/* Somatic Breath Pacer Modal */}
+      <SomaticPacerModal visible={pacerVisible} onClose={() => setPacerVisible(false)} />
+
+      {/* Focus Sprint Timer Modal */}
+      <FocusTimerModal
+        visible={focusTimerVisible}
+        initialTask={selectedTaskForTimer}
+        onClose={() => {
+          setSelectedTaskForTimer(null);
+          setFocusTimerVisible(false);
+        }}
+      />
+
+      {/* Circadian Schedule Optimizer Modal */}
+      <ScheduleOptimizerModal
+        visible={optimizerVisible}
+        onClose={() => setOptimizerVisible(false)}
+      />
+
+      {/* AI Quick Capture Modal */}
+      <QuickCaptureModal
+        visible={quickCaptureVisible}
+        onClose={() => setQuickCaptureVisible(false)}
+      />
     </View>
   );
 };
@@ -247,6 +384,23 @@ export const TodayScreen: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+  },
+  quickAddBtn: {
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  quickAddBtnText: {
+    color: '#FFF',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  headerLogo: {
+    width: 38,
+    height: 38,
+    borderRadius: 10,
   },
   header: {
     paddingTop: 54,
@@ -286,7 +440,7 @@ const styles = StyleSheet.create({
     padding: 16,
     borderRadius: 16,
     borderWidth: 1.5,
-    marginBottom: 16,
+    marginBottom: 12,
   },
   energyCardTop: {
     flexDirection: 'row',
@@ -324,6 +478,28 @@ const styles = StyleSheet.create({
   tagText: {
     fontSize: 11,
     fontWeight: '600',
+  },
+  toolbeltRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 16,
+  },
+  toolChip: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 10,
+    borderRadius: 12,
+    borderWidth: 1,
+    gap: 6,
+  },
+  toolIcon: {
+    fontSize: 14,
+  },
+  toolLabel: {
+    fontSize: 11,
+    fontWeight: '700',
   },
   statsRow: {
     flexDirection: 'row',
