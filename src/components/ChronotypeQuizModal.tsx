@@ -62,7 +62,7 @@ export const ChronotypeQuizModal: React.FC<ChronotypeQuizModalProps> = ({
   const currentQ = CHRONOTYPE_QUIZ_QUESTIONS[currentStep];
 
   return (
-    <Modal visible={visible} animationType="slide" transparent>
+    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
       <View style={styles.overlay}>
         <View
           style={[

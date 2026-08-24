@@ -6,8 +6,13 @@ const DATABASE_NAME = 'efficient_me.db';
 let dbInstance: SQLite.SQLiteDatabase | null = null;
 
 export async function getDatabase(): Promise<SQLite.SQLiteDatabase> {
-  if (dbInstance) {
-    return dbInstance;
+  try {
+    if (dbInstance) {
+      await dbInstance.getFirstAsync('SELECT 1');
+      return dbInstance;
+    }
+  } catch {
+    dbInstance = null;
   }
 
   dbInstance = await SQLite.openDatabaseAsync(DATABASE_NAME);
@@ -27,7 +32,16 @@ export async function initializeDatabase(): Promise<void> {
     
     // Execute DDL schema creation
     await db.execAsync(CREATE_TABLES_SQL);
-    
+
+    // Safe column migrations for existing databases
+    try {
+      await db.execAsync(
+        `ALTER TABLE tasks ADD COLUMN is_escalating_birthday INTEGER NOT NULL DEFAULT 0;`
+      );
+    } catch {
+      // Column already exists
+    }
+
     // Seed initial starter items if fresh database
     await db.execAsync(SEED_DATA_SQL);
     

@@ -1,6 +1,8 @@
 import { create } from 'zustand';
 import { Task, EnergyLevel, TaskStatus } from '../types';
 import { taskRepository } from '../database/repositories/taskRepository';
+import { widgetService } from '../services/widget/widgetService';
+import { useGoalStore } from './useGoalStore';
 
 interface TaskState {
   tasks: Task[];
@@ -11,6 +13,7 @@ interface TaskState {
   toggleTask: (id: string, currentStatus: TaskStatus) => Promise<void>;
   deferTask: (id: string, newDueDate: string) => Promise<void>;
   deleteTask: (id: string) => Promise<void>;
+  updateTask: (id: string, data: Partial<Task>) => Promise<void>;
   setEnergyFilter: (filter: EnergyLevel | null) => void;
 }
 
@@ -36,6 +39,8 @@ export const useTaskStore = create<TaskState>((set, get) => ({
       set((state) => ({
         tasks: [newTask, ...state.tasks],
       }));
+      widgetService.syncWidgetSnapshot().catch(() => {});
+      useGoalStore.getState().loadGoals().catch(() => {});
     } catch (error) {
       console.error('[TaskStore] Failed to add task:', error);
     }
@@ -52,6 +57,8 @@ export const useTaskStore = create<TaskState>((set, get) => ({
 
     try {
       await taskRepository.toggleTaskStatus(id, currentStatus);
+      widgetService.syncWidgetSnapshot().catch(() => {});
+      useGoalStore.getState().loadGoals().catch(() => {});
     } catch (error) {
       console.error('[TaskStore] Failed to toggle task status, rolling back:', error);
       get().loadTasks();
@@ -80,8 +87,25 @@ export const useTaskStore = create<TaskState>((set, get) => ({
 
     try {
       await taskRepository.deleteTask(id);
+      widgetService.syncWidgetSnapshot().catch(() => {});
+      useGoalStore.getState().loadGoals().catch(() => {});
     } catch (error) {
       console.error('[TaskStore] Failed to delete task:', error);
+      get().loadTasks();
+    }
+  },
+
+  updateTask: async (id, data) => {
+    set((state) => ({
+      tasks: state.tasks.map((t) => (t.id === id ? { ...t, ...data } : t)),
+    }));
+
+    try {
+      await taskRepository.updateTask(id, data);
+      widgetService.syncWidgetSnapshot().catch(() => {});
+      useGoalStore.getState().loadGoals().catch(() => {});
+    } catch (error) {
+      console.error('[TaskStore] Failed to update task:', error);
       get().loadTasks();
     }
   },

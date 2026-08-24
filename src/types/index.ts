@@ -17,6 +17,7 @@ export interface Task {
   goalId?: string;
   isRecurringChore?: boolean;
   choreCadence?: 'daily' | 'weekly' | 'monthly' | '3_month' | '6_month' | 'yearly';
+  isEscalatingBirthday?: boolean;
   createdAt: string;
   updatedAt: string;
   completedAt?: string;
