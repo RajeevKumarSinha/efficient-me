@@ -40,6 +40,7 @@ export const FocusTimerModal: React.FC<FocusTimerModalProps> = ({
   const [isCompleted, setIsCompleted] = useState(false);
   const [targetTask, setTargetTask] = useState<Task | null>(initialTask);
   const [selectedSoundscape, setSelectedSoundscape] = useState<SoundscapeType>('binaural_alpha');
+  const [volume, setVolume] = useState<number>(0.6);
 
   const timerRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -86,6 +87,17 @@ export const FocusTimerModal: React.FC<FocusTimerModalProps> = ({
     }
   };
 
+  const handleVolumeChange = (newVol: number) => {
+    notificationEngine.triggerHaptic('light');
+    setVolume(newVol);
+    soundscapeService.setVolume(newVol);
+  };
+
+  const handleTestChime = () => {
+    notificationEngine.triggerHaptic('success');
+    soundscapeService.playTimerCompleteChime();
+  };
+
   useEffect(() => {
     if (isRunning) {
       timerRef.current = setInterval(() => {
@@ -114,6 +126,7 @@ export const FocusTimerModal: React.FC<FocusTimerModalProps> = ({
     stopTimer();
     setIsCompleted(true);
     notificationEngine.triggerHaptic('success');
+    soundscapeService.playTimerCompleteChime();
   };
 
   const handleMarkTaskDone = async () => {
@@ -136,6 +149,11 @@ export const FocusTimerModal: React.FC<FocusTimerModalProps> = ({
   return (
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
       <View style={styles.overlay}>
+        <TouchableOpacity
+          style={StyleSheet.absoluteFill}
+          onPress={onClose}
+          activeOpacity={1}
+        />
         <View
           style={[
             styles.container,
@@ -154,14 +172,20 @@ export const FocusTimerModal: React.FC<FocusTimerModalProps> = ({
                   : 'Bypass task inertia with single-task flow'}
               </Text>
             </View>
-            <TouchableOpacity onPress={onClose} style={styles.closeBtn} activeOpacity={0.7}>
+            <TouchableOpacity
+              onPress={onClose}
+              style={styles.closeBtn}
+              activeOpacity={0.7}
+              hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+            >
               <Text style={[styles.closeText, { color: theme.colors.textMuted }]}>✕</Text>
             </TouchableOpacity>
           </View>
 
-          {/* Preset Buttons */}
-          {!isRunning && !isCompleted && (
-            <View style={styles.presetsRow}>
+          <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 10 }}>
+            {/* Preset Buttons */}
+            {!isRunning && !isCompleted && (
+              <View style={styles.presetsRow}>
               {[
                 { mins: 5 as FocusDurationPreset, label: '5m Micro-Burst', icon: '⚡' },
                 { mins: 20 as FocusDurationPreset, label: '20m Pomodoro', icon: '🍅' },
@@ -239,14 +263,20 @@ export const FocusTimerModal: React.FC<FocusTimerModalProps> = ({
 
           {/* Soundscape Selector Bar */}
           <View style={styles.soundscapeContainer}>
-            <Text style={[styles.soundscapeLabel, { color: theme.colors.textMuted }]}>
-              🎧 Ambient Audio Soundscape:
-            </Text>
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.soundscapeRow}
-            >
+            <View style={styles.soundscapeHeaderRow}>
+              <Text style={[styles.soundscapeLabel, { color: theme.colors.textMuted }]}>
+                🎧 Ambient Audio Soundscape
+              </Text>
+              {isRunning && selectedSoundscape !== 'none' && (
+                <View style={[styles.audioLiveBadge, { backgroundColor: theme.colors.accentLight }]}>
+                  <Text style={[styles.audioLiveText, { color: theme.colors.accent }]}>
+                    🔊 Playing Loop
+                  </Text>
+                </View>
+              )}
+            </View>
+
+            <View style={styles.soundscapeGrid}>
               {SOUNDSCAPE_TRACKS.map((t) => {
                 const isSel = selectedSoundscape === t.id;
                 return (
@@ -276,10 +306,59 @@ export const FocusTimerModal: React.FC<FocusTimerModalProps> = ({
                   </TouchableOpacity>
                 );
               })}
-            </ScrollView>
-          </View>
+            </View>
 
-          {/* Action Footer */}
+            {/* Volume Controls & Chime Test Bar */}
+            <View style={styles.audioControlsRow}>
+              <View style={styles.volumeGroup}>
+                <Text style={[styles.volumeLabel, { color: theme.colors.textMuted }]}>Volume:</Text>
+                {[0.25, 0.5, 0.75, 1.0].map((v) => {
+                  const isVolSel = Math.abs(volume - v) < 0.1;
+                  return (
+                    <TouchableOpacity
+                      key={v}
+                      style={[
+                        styles.volChip,
+                        {
+                          backgroundColor: isVolSel
+                            ? theme.colors.accentLight
+                            : theme.colors.cardBackgroundElevated,
+                          borderColor: isVolSel ? theme.colors.accent : theme.colors.cardBorder,
+                        },
+                      ]}
+                      onPress={() => handleVolumeChange(v)}
+                      activeOpacity={0.7}
+                    >
+                      <Text
+                        style={[
+                          styles.volChipText,
+                          { color: isVolSel ? theme.colors.accent : theme.colors.textMuted },
+                        ]}
+                      >
+                        {Math.round(v * 100)}%
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+
+              <TouchableOpacity
+                style={[
+                  styles.testChimeBtn,
+                  { backgroundColor: theme.colors.cardBackgroundElevated, borderColor: theme.colors.cardBorder },
+                ]}
+                onPress={handleTestChime}
+                activeOpacity={0.7}
+              >
+                <Text style={[styles.testChimeText, { color: theme.colors.textSecondary }]}>
+                  🔔 Test Bell
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </ScrollView>
+
+        {/* Action Footer */}
           <View style={styles.footer}>
             {isCompleted ? (
               <View style={styles.completedActionsRow}>
@@ -385,7 +464,11 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   closeBtn: {
-    padding: 6,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   closeText: {
     fontSize: 18,
@@ -416,23 +499,22 @@ const styles = StyleSheet.create({
   timerStage: {
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 20,
+    paddingVertical: 10,
   },
   outerRing: {
-    width: 200,
-    height: 200,
-    borderRadius: 100,
-    borderWidth: 3,
+    width: 150,
+    height: 150,
+    borderRadius: 75,
+    borderWidth: 5,
     alignItems: 'center',
     justifyContent: 'center',
   },
   innerRingContent: {
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 4,
   },
   timerDigits: {
-    fontSize: 40,
+    fontSize: 32,
     fontWeight: '900',
     fontVariant: ['tabular-nums'],
     letterSpacing: 1,
@@ -452,7 +534,12 @@ const styles = StyleSheet.create({
   soundscapeContainer: {
     paddingHorizontal: 16,
     paddingBottom: 10,
-    gap: 6,
+    gap: 8,
+  },
+  soundscapeHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
   },
   soundscapeLabel: {
     fontSize: 11,
@@ -460,8 +547,19 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
-  soundscapeRow: {
-    gap: 8,
+  audioLiveBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  audioLiveText: {
+    fontSize: 10,
+    fontWeight: '700',
+  },
+  soundscapeGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
     paddingVertical: 4,
   },
   soundscapeChip: {
@@ -477,6 +575,44 @@ const styles = StyleSheet.create({
     fontSize: 13,
   },
   soundscapeText: {
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  audioControlsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 4,
+    gap: 8,
+  },
+  volumeGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+  },
+  volumeLabel: {
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  volChip: {
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    borderRadius: 6,
+    borderWidth: 1,
+  },
+  volChipText: {
+    fontSize: 10,
+    fontWeight: '700',
+  },
+  testChimeBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  testChimeText: {
     fontSize: 11,
     fontWeight: '600',
   },

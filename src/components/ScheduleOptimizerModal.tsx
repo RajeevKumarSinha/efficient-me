@@ -62,6 +62,11 @@ export const ScheduleOptimizerModal: React.FC<ScheduleOptimizerModalProps> = ({
   return (
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
       <View style={styles.overlay}>
+        <TouchableOpacity
+          style={StyleSheet.absoluteFill}
+          onPress={onClose}
+          activeOpacity={1}
+        />
         <View
           style={[
             styles.container,

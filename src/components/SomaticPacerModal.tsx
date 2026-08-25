@@ -239,6 +239,11 @@ export const SomaticPacerModal: React.FC<SomaticPacerModalProps> = ({
   return (
     <Modal visible={visible} animationType="fade" transparent onRequestClose={onClose}>
       <View style={styles.overlay}>
+        <TouchableOpacity
+          style={StyleSheet.absoluteFill}
+          onPress={onClose}
+          activeOpacity={1}
+        />
         <View
           style={[
             styles.container,

@@ -76,6 +76,11 @@ export const QuickCaptureModal: React.FC<QuickCaptureModalProps> = ({
   return (
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
       <View style={styles.overlay}>
+        <TouchableOpacity
+          style={StyleSheet.absoluteFill}
+          onPress={onClose}
+          activeOpacity={1}
+        />
         <View
           style={[
             styles.container,
@@ -84,7 +89,7 @@ export const QuickCaptureModal: React.FC<QuickCaptureModalProps> = ({
         >
           {/* Header */}
           <View style={[styles.header, { borderBottomColor: theme.colors.cardBorder }]}>
-            <View>
+            <View style={{ flex: 1 }}>
               <Text style={[styles.title, { color: theme.colors.textPrimary }]}>
                 ⚡ AI Quick Capture
               </Text>
@@ -92,7 +97,12 @@ export const QuickCaptureModal: React.FC<QuickCaptureModalProps> = ({
                 Natural language parsing for energy, dates & chore cadences
               </Text>
             </View>
-            <TouchableOpacity onPress={onClose} style={styles.closeBtn} activeOpacity={0.7}>
+            <TouchableOpacity
+              onPress={onClose}
+              style={styles.closeBtn}
+              activeOpacity={0.7}
+              hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+            >
               <Text style={[styles.closeText, { color: theme.colors.textMuted }]}>✕</Text>
             </TouchableOpacity>
           </View>
@@ -269,7 +279,11 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   closeBtn: {
-    padding: 6,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   closeText: {
     fontSize: 18,
