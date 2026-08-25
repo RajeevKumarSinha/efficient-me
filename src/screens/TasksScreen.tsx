@@ -1026,7 +1026,10 @@ export const TasksScreen: React.FC = () => {
       <FocusTimerModal
         visible={focusTimerVisible}
         initialTask={selectedTaskForTimer}
-        onClose={() => setFocusTimerVisible(false)}
+        onClose={() => {
+          setSelectedTaskForTimer(null);
+          setFocusTimerVisible(false);
+        }}
       />
 
       {/* Circadian Schedule Optimizer Modal */}

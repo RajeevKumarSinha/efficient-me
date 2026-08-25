@@ -1,3 +1,5 @@
+import { Audio } from 'expo-av';
+import { Asset } from 'expo-asset';
 import { Platform } from 'react-native';
 
 export type SoundscapeType = 'rain' | 'binaural_alpha' | 'forest_stream' | 'brown_noise' | 'none';
@@ -30,7 +32,7 @@ export const SOUNDSCAPE_TRACKS: SoundscapeTrack[] = [
     title: '10 Hz Alpha Waves',
     icon: '🌊',
     frequencyDesc: '10 Hz Binaural Flow',
-    description: 'Neuroscience-backed frequencies that encourage calm, alert focus',
+    description: 'Neuroscience-backed frequencies (432 Hz carrier) that encourage flow',
   },
   {
     id: 'forest_stream',
@@ -48,17 +50,46 @@ export const SOUNDSCAPE_TRACKS: SoundscapeTrack[] = [
   },
 ];
 
+const SOUND_ASSETS: Record<Exclude<SoundscapeType, 'none'> | 'timer_complete', any> = {
+  rain: require('../../assets/sounds/rain.wav'),
+  binaural_alpha: require('../../assets/sounds/binaural_alpha.wav'),
+  forest_stream: require('../../assets/sounds/forest_stream.wav'),
+  brown_noise: require('../../assets/sounds/brown_noise.wav'),
+  timer_complete: require('../../assets/sounds/timer_complete.wav'),
+};
+
 class SoundscapeService {
   private activeTrack: SoundscapeType = 'none';
   private isPlaying: boolean = false;
-  private volume: number = 0.5;
+  private volume: number = 0.6;
+  private soundObject: Audio.Sound | null = null;
+  private audioModeInitialized: boolean = false;
+
+  // Web fallback nodes
   private audioContext: any = null;
   private oscillatorNode: any = null;
   private gainNode: any = null;
   private noiseNode: any = null;
 
   constructor() {
+    this.initAudioMode();
     this.initWebAudio();
+  }
+
+  private async initAudioMode() {
+    if (this.audioModeInitialized) return;
+    try {
+      await Audio.setAudioModeAsync({
+        allowsRecordingIOS: false,
+        playsInSilentModeIOS: true,
+        staysActiveInBackground: true,
+        shouldDuckAndroid: true,
+        playThroughEarpieceAndroid: false,
+      });
+      this.audioModeInitialized = true;
+    } catch (e) {
+      console.warn('[SoundscapeService] Audio mode initialization warning:', e);
+    }
   }
 
   private initWebAudio() {
@@ -82,9 +113,18 @@ class SoundscapeService {
     return this.isPlaying;
   }
 
-  public setVolume(vol: number): void {
+  public getVolume(): number {
+    return this.volume;
+  }
+
+  public async setVolume(vol: number): Promise<void> {
     this.volume = Math.max(0, Math.min(1, vol));
-    if (this.gainNode) {
+    if (this.soundObject) {
+      try {
+        await this.soundObject.setVolumeAsync(this.volume);
+      } catch {}
+    }
+    if (this.gainNode && this.audioContext) {
       try {
         this.gainNode.gain.setValueAtTime(this.volume * 0.15, this.audioContext.currentTime);
       } catch {}
@@ -92,7 +132,7 @@ class SoundscapeService {
   }
 
   public async playSoundscape(track: SoundscapeType): Promise<void> {
-    this.stopSoundscape();
+    await this.stopSoundscape();
     this.activeTrack = track;
 
     if (track === 'none') {
@@ -102,50 +142,147 @@ class SoundscapeService {
 
     this.isPlaying = true;
 
-    // Synthesize ambient soundscape via WebAudio API if running on web/engine
-    if (this.audioContext) {
-      try {
-        if (this.audioContext.state === 'suspended') {
-          await this.audioContext.resume();
-        }
-
-        this.gainNode = this.audioContext.createGain();
-        this.gainNode.gain.setValueAtTime(this.volume * 0.15, this.audioContext.currentTime);
-        this.gainNode.connect(this.audioContext.destination);
-
-        if (track === 'binaural_alpha') {
-          // Synthesize dual tone 200 Hz & 210 Hz = 10 Hz Alpha beat
-          this.oscillatorNode = this.audioContext.createOscillator();
-          this.oscillatorNode.type = 'sine';
-          this.oscillatorNode.frequency.setValueAtTime(200, this.audioContext.currentTime);
-          this.oscillatorNode.connect(this.gainNode);
-          this.oscillatorNode.start();
-        } else if (track === 'brown_noise' || track === 'rain') {
-          // Generate warm buffer noise
-          const bufferSize = this.audioContext.sampleRate * 2;
-          const noiseBuffer = this.audioContext.createBuffer(1, bufferSize, this.audioContext.sampleRate);
-          const output = noiseBuffer.getChannelData(0);
-          let lastOut = 0.0;
-          for (let i = 0; i < bufferSize; i++) {
-            const white = Math.random() * 2 - 1;
-            output[i] = (lastOut + 0.02 * white) / 1.02; // Brown noise integration
-            lastOut = output[i];
+    try {
+      await this.initAudioMode();
+      const moduleAsset = SOUND_ASSETS[track];
+      if (moduleAsset) {
+        let soundSource: any = moduleAsset;
+        try {
+          const assetObj = Asset.fromModule(moduleAsset);
+          if (!assetObj.downloaded) {
+            await assetObj.downloadAsync();
           }
-          this.noiseNode = this.audioContext.createBufferSource();
-          this.noiseNode.buffer = noiseBuffer;
-          this.noiseNode.loop = true;
-          this.noiseNode.connect(this.gainNode);
-          this.noiseNode.start();
+          if (assetObj.localUri || assetObj.uri) {
+            soundSource = { uri: assetObj.localUri || assetObj.uri };
+          }
+        } catch (assetErr) {
+          console.warn('[SoundscapeService] Asset downloadAsync fallback to module:', assetErr);
         }
-      } catch (e) {
-        console.warn('[SoundscapeService] Synthesizer audio play error:', e);
+
+        const { sound, status } = await Audio.Sound.createAsync(
+          soundSource,
+          {
+            isLooping: true,
+            volume: this.volume,
+            shouldPlay: true,
+          }
+        );
+        this.soundObject = sound;
+        console.log(`[SoundscapeService] Playing ${track} successfully!`, status);
+        return;
       }
+    } catch (err) {
+      console.error(`[SoundscapeService] Native expo-av playback failed for ${track}:`, err);
+    }
+
+    // WebAudio synthesis fallback
+    this.playWebAudioSynthesis(track);
+  }
+
+  public async playTimerCompleteChime(): Promise<void> {
+    try {
+      await this.initAudioMode();
+      const moduleAsset = SOUND_ASSETS.timer_complete;
+      let soundSource: any = moduleAsset;
+      try {
+        const assetObj = Asset.fromModule(moduleAsset);
+        if (!assetObj.downloaded) {
+          await assetObj.downloadAsync();
+        }
+        if (assetObj.localUri || assetObj.uri) {
+          soundSource = { uri: assetObj.localUri || assetObj.uri };
+        }
+      } catch {}
+
+      const { sound } = await Audio.Sound.createAsync(
+        soundSource,
+        {
+          isLooping: false,
+          volume: Math.max(0.7, this.volume),
+          shouldPlay: true,
+        }
+      );
+      sound.setOnPlaybackStatusUpdate((status) => {
+        if (status.isLoaded && status.didJustFinish) {
+          sound.unloadAsync().catch(() => {});
+        }
+      });
+      console.log('[SoundscapeService] Completion chime triggered successfully');
+    } catch (e) {
+      console.error('[SoundscapeService] Complete chime error:', e);
+      this.playWebChime();
     }
   }
 
-  public stopSoundscape(): void {
+  public async stopSoundscape(): Promise<void> {
     this.isPlaying = false;
 
+    if (this.soundObject) {
+      try {
+        await this.soundObject.stopAsync();
+        await this.soundObject.unloadAsync();
+      } catch {}
+      this.soundObject = null;
+    }
+
+    this.stopWebAudioSynthesis();
+  }
+
+  private playWebAudioSynthesis(track: SoundscapeType): void {
+    if (!this.audioContext) return;
+    try {
+      if (this.audioContext.state === 'suspended') {
+        this.audioContext.resume().catch(() => {});
+      }
+
+      this.gainNode = this.audioContext.createGain();
+      this.gainNode.gain.setValueAtTime(this.volume * 0.15, this.audioContext.currentTime);
+      this.gainNode.connect(this.audioContext.destination);
+
+      if (track === 'binaural_alpha') {
+        this.oscillatorNode = this.audioContext.createOscillator();
+        this.oscillatorNode.type = 'sine';
+        this.oscillatorNode.frequency.setValueAtTime(432, this.audioContext.currentTime);
+        this.oscillatorNode.connect(this.gainNode);
+        this.oscillatorNode.start();
+      } else if (track === 'brown_noise' || track === 'rain' || track === 'forest_stream') {
+        const bufferSize = this.audioContext.sampleRate * 2;
+        const noiseBuffer = this.audioContext.createBuffer(1, bufferSize, this.audioContext.sampleRate);
+        const output = noiseBuffer.getChannelData(0);
+        let lastOut = 0.0;
+        for (let i = 0; i < bufferSize; i++) {
+          const white = Math.random() * 2 - 1;
+          output[i] = (lastOut + 0.02 * white) / 1.02;
+          lastOut = output[i];
+        }
+        this.noiseNode = this.audioContext.createBufferSource();
+        this.noiseNode.buffer = noiseBuffer;
+        this.noiseNode.loop = true;
+        this.noiseNode.connect(this.gainNode);
+        this.noiseNode.start();
+      }
+    } catch (e) {
+      console.warn('[SoundscapeService] WebAudio synth error:', e);
+    }
+  }
+
+  private playWebChime(): void {
+    if (!this.audioContext) return;
+    try {
+      const osc = this.audioContext.createOscillator();
+      const gain = this.audioContext.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(528, this.audioContext.currentTime);
+      gain.gain.setValueAtTime(0.3, this.audioContext.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, this.audioContext.currentTime + 3.0);
+      osc.connect(gain);
+      gain.connect(this.audioContext.destination);
+      osc.start();
+      osc.stop(this.audioContext.currentTime + 3.0);
+    } catch {}
+  }
+
+  private stopWebAudioSynthesis(): void {
     if (this.oscillatorNode) {
       try {
         this.oscillatorNode.stop();
@@ -153,7 +290,6 @@ class SoundscapeService {
       } catch {}
       this.oscillatorNode = null;
     }
-
     if (this.noiseNode) {
       try {
         this.noiseNode.stop();
@@ -161,7 +297,6 @@ class SoundscapeService {
       } catch {}
       this.noiseNode = null;
     }
-
     if (this.gainNode) {
       try {
         this.gainNode.disconnect();
