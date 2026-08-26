@@ -61,6 +61,7 @@ function MainApp() {
       try {
         await initializeDatabase();
         await notificationEngine.init();
+        await notificationEngine.scheduleDailyCircadianCheckIn();
 
         // Register interactive notification action handlers
         sub = notificationEngine.registerResponseHandler({
@@ -82,6 +83,9 @@ function MainApp() {
             } catch (e) {
               console.warn('Failed to defer task from notification:', e);
             }
+          },
+          onCheckIn: () => {
+            setActiveTab('today');
           },
         });
       } catch (e) {
