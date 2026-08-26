@@ -4,11 +4,15 @@ import {
   View,
   Text,
   TouchableOpacity,
-  SafeAreaView,
   StatusBar,
   ActivityIndicator,
   LogBox,
+  Platform,
+  AppState,
+  AppStateStatus,
 } from 'react-native';
+import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
+import * as NavigationBar from 'expo-navigation-bar';
 
 LogBox.ignoreAllLogs();
 import { initializeDatabase } from './src/database/db';
@@ -24,11 +28,31 @@ import { taskRepository } from './src/database/repositories/taskRepository';
 
 type TabType = 'today' | 'tasks' | 'habits' | 'goals' | 'insights';
 
-export default function App() {
+/**
+ * Configures Android Sticky Immersive Mode:
+ * - Hides the 3-button / gesture navigation bar by default.
+ * - Sets behavior to 'overlay-swipe': swiping up from bottom reveals transient bar without pushing layout, auto-hiding after a few seconds.
+ * - Matches navigation bar background color and icon theme to current active palette.
+ */
+async function configureAndroidImmersiveMode(tabBgColor: string, isDark: boolean) {
+  if (Platform.OS === 'android') {
+    try {
+      await NavigationBar.setVisibilityAsync('hidden');
+      await NavigationBar.setBehaviorAsync('overlay-swipe');
+      await NavigationBar.setBackgroundColorAsync(tabBgColor || '#090D16');
+      await NavigationBar.setButtonStyleAsync(isDark ? 'light' : 'dark');
+    } catch {
+      // Graceful fallback for non-supported environments
+    }
+  }
+}
+
+function MainApp() {
   const { theme, isDarkMode } = useThemeStore();
   const { loadTasks } = useTaskStore();
   const [activeTab, setActiveTab] = useState<TabType>('today');
   const [isReady, setIsReady] = useState(false);
+  const insets = useSafeAreaInsets();
 
   useEffect(() => {
     let sub: { remove: () => void } | null = null;
@@ -74,6 +98,21 @@ export default function App() {
     };
   }, []);
 
+  // Configure and maintain Android sticky immersive mode
+  useEffect(() => {
+    configureAndroidImmersiveMode(theme.colors.tabBarBackground, isDarkMode);
+
+    const subscription = AppState.addEventListener('change', (nextAppState: AppStateStatus) => {
+      if (nextAppState === 'active') {
+        configureAndroidImmersiveMode(theme.colors.tabBarBackground, isDarkMode);
+      }
+    });
+
+    return () => {
+      subscription.remove();
+    };
+  }, [theme.colors.tabBarBackground, isDarkMode]);
+
   if (!isReady) {
     return (
       <View style={[styles.loadingContainer, { backgroundColor: theme.colors.background }]}>
@@ -109,8 +148,12 @@ export default function App() {
   ];
 
   return (
-    <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.colors.background }]}>
-      <StatusBar barStyle={isDarkMode ? 'light-content' : 'dark-content'} />
+    <View style={[styles.root, { backgroundColor: theme.colors.background }]}>
+      <StatusBar
+        barStyle={isDarkMode ? 'light-content' : 'dark-content'}
+        backgroundColor="transparent"
+        translucent
+      />
       <View style={styles.container}>{renderActiveScreen()}</View>
 
       {/* Modern Bottom Navigation Bar */}
@@ -120,6 +163,7 @@ export default function App() {
           {
             backgroundColor: theme.colors.tabBarBackground,
             borderTopColor: theme.colors.tabBarBorder,
+            paddingBottom: Math.max(insets.bottom, 10),
           },
         ]}
       >
@@ -151,12 +195,20 @@ export default function App() {
           );
         })}
       </View>
-    </SafeAreaView>
+    </View>
+  );
+}
+
+export default function App() {
+  return (
+    <SafeAreaProvider>
+      <MainApp />
+    </SafeAreaProvider>
   );
 }
 
 const styles = StyleSheet.create({
-  safeArea: {
+  root: {
     flex: 1,
   },
   container: {
@@ -174,15 +226,16 @@ const styles = StyleSheet.create({
   },
   tabBar: {
     flexDirection: 'row',
-    height: 62,
     borderTopWidth: 1,
-    paddingBottom: 6,
-    paddingTop: 6,
+    paddingTop: 8,
+    alignItems: 'center',
+    justifyContent: 'space-around',
   },
   tabItem: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
+    paddingVertical: 2,
   },
   tabIcon: {
     fontSize: 18,
