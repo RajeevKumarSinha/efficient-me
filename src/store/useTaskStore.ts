@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { Task, EnergyLevel, TaskStatus } from '../types';
 import { taskRepository } from '../database/repositories/taskRepository';
 import { widgetService } from '../services/widget/widgetService';
+import { notificationEngine } from '../services/notifications/notificationEngine';
 import { useGoalStore } from './useGoalStore';
 
 interface TaskState {
@@ -39,6 +40,7 @@ export const useTaskStore = create<TaskState>((set, get) => ({
       set((state) => ({
         tasks: [newTask, ...state.tasks],
       }));
+      notificationEngine.scheduleTaskReminder(newTask).catch(() => {});
       widgetService.syncWidgetSnapshot().catch(() => {});
       useGoalStore.getState().loadGoals().catch(() => {});
     } catch (error) {
@@ -57,6 +59,9 @@ export const useTaskStore = create<TaskState>((set, get) => ({
 
     try {
       await taskRepository.toggleTaskStatus(id, currentStatus);
+      if (nextStatus === 'completed') {
+        notificationEngine.cancelEntityNotifications(id).catch(() => {});
+      }
       widgetService.syncWidgetSnapshot().catch(() => {});
       useGoalStore.getState().loadGoals().catch(() => {});
     } catch (error) {
@@ -74,6 +79,10 @@ export const useTaskStore = create<TaskState>((set, get) => ({
 
     try {
       await taskRepository.deferTask(id, newDueDate);
+      const updated = get().tasks.find((t) => t.id === id);
+      if (updated) {
+        notificationEngine.scheduleTaskReminder(updated).catch(() => {});
+      }
     } catch (error) {
       console.error('[TaskStore] Failed to defer task:', error);
       get().loadTasks();
@@ -87,6 +96,7 @@ export const useTaskStore = create<TaskState>((set, get) => ({
 
     try {
       await taskRepository.deleteTask(id);
+      notificationEngine.cancelEntityNotifications(id).catch(() => {});
       widgetService.syncWidgetSnapshot().catch(() => {});
       useGoalStore.getState().loadGoals().catch(() => {});
     } catch (error) {
@@ -102,6 +112,10 @@ export const useTaskStore = create<TaskState>((set, get) => ({
 
     try {
       await taskRepository.updateTask(id, data);
+      const updated = get().tasks.find((t) => t.id === id);
+      if (updated) {
+        notificationEngine.scheduleTaskReminder(updated).catch(() => {});
+      }
       widgetService.syncWidgetSnapshot().catch(() => {});
       useGoalStore.getState().loadGoals().catch(() => {});
     } catch (error) {

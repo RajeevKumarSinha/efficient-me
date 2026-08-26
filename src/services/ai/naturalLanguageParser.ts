@@ -84,17 +84,21 @@ export function parseNaturalLanguageTask(input: string): ParsedQuickCapture {
   }
 
   // 2. Detect Energy Level (e.g. 1⚡, 2⚡, 3⚡, low energy, high energy, med energy)
-  if (/\b(3⚡|3 energy|high energy|deep work|intense|focus 3)\b/i.test(text)) {
+  const highEnergyPattern = /(?:^|\s)(?:3⚡|3\s*energy|high\s*energy|deep\s*work|intense|focus\s*3)(?=\s|$)/i;
+  const lowEnergyPattern = /(?:^|\s)(?:1⚡|1\s*energy|low\s*energy|gentle|easy|chill|micro)(?=\s|$)/i;
+  const medEnergyPattern = /(?:^|\s)(?:2⚡|2\s*energy|med\s*energy|medium\s*energy|standard)(?=\s|$)/i;
+
+  if (highEnergyPattern.test(text)) {
     energyLevel = 3;
-    text = text.replace(/\b(3⚡|3 energy|high energy|deep work|intense|focus 3)\b/gi, '');
+    text = text.replace(highEnergyPattern, ' ');
     detectedTags.push({ label: '3⚡ High Energy', icon: '🔥', colorType: 'energy' });
-  } else if (/\b(1⚡|1 energy|low energy|gentle|easy|chill|micro)\b/i.test(text)) {
+  } else if (lowEnergyPattern.test(text)) {
     energyLevel = 1;
-    text = text.replace(/\b(1⚡|1 energy|low energy|gentle|easy|chill|micro)\b/gi, '');
+    text = text.replace(lowEnergyPattern, ' ');
     detectedTags.push({ label: '1⚡ Gentle', icon: '🍃', colorType: 'energy' });
-  } else if (/\b(2⚡|2 energy|med energy|medium energy|standard)\b/i.test(text)) {
+  } else if (medEnergyPattern.test(text)) {
     energyLevel = 2;
-    text = text.replace(/\b(2⚡|2 energy|med energy|medium energy|standard)\b/gi, '');
+    text = text.replace(medEnergyPattern, ' ');
     detectedTags.push({ label: '2⚡ Medium', icon: '⚡', colorType: 'energy' });
   }
 
@@ -210,15 +214,15 @@ export function parseNaturalLanguageTask(input: string): ParsedQuickCapture {
 
   // 6. Detect Relative Dates (e.g. tomorrow, in X days, next monday, this friday)
   if (!dateExplicitlyFound) {
-    if (/\b(tomorrow)\b/i.test(text)) {
+    if (/\b(?:due\s+)?(tomorrow)\b/i.test(text)) {
       targetDate = new Date(today);
       targetDate.setDate(today.getDate() + 1);
-      text = text.replace(/\b(tomorrow)\b/gi, '');
+      text = text.replace(/\b(?:due\s+)?(tomorrow)\b/gi, '');
       detectedTags.push({ label: 'Tomorrow', icon: '📅', colorType: 'date' });
       dateExplicitlyFound = true;
-    } else if (/\b(today)\b/i.test(text)) {
+    } else if (/\b(?:due\s+)?(today)\b/i.test(text)) {
       targetDate = new Date(today);
-      text = text.replace(/\b(today)\b/gi, '');
+      text = text.replace(/\b(?:due\s+)?(today)\b/gi, '');
       detectedTags.push({ label: 'Today', icon: '📅', colorType: 'date' });
       dateExplicitlyFound = true;
     } else {
@@ -284,8 +288,8 @@ export function parseNaturalLanguageTask(input: string): ParsedQuickCapture {
   // Clean trailing/leading prepositions, spaces, and punctuation
   const cleanTitle =
     text
-      .replace(/\s+(on|at|for|by|every)\s*$/gi, '')
-      .replace(/^\s*(on|at|for|by|every)\s+/gi, '')
+      .replace(/\s+(on|at|for|by|every|due|in)\s*$/gi, '')
+      .replace(/^\s*(on|at|for|by|every|due|in)\s+/gi, '')
       .replace(/\s+/g, ' ')
       .replace(/^[,;.\s-]+/, '')
       .replace(/[,;.\s-]+$/, '')
