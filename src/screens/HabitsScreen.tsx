@@ -8,6 +8,7 @@ import {
   TextInput,
   Modal,
 } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { useThemeStore } from '../store/useThemeStore';
 import { useHabitStore } from '../store/useHabitStore';
 import { HabitCard } from '../components/HabitCard';
@@ -16,6 +17,7 @@ import { EnergyLevel } from '../types';
 import { notificationEngine } from '../services/notifications/notificationEngine';
 
 export const HabitsScreen: React.FC = () => {
+  const { t } = useTranslation();
   const { theme } = useThemeStore();
   const { habits, todayLogs, addHabit, updateHabit } = useHabitStore();
 
@@ -95,9 +97,9 @@ export const HabitsScreen: React.FC = () => {
       {/* Header */}
       <View style={[styles.header, { borderBottomColor: theme.colors.cardBorder }]}>
         <View>
-          <Text style={[styles.headerTitle, { color: theme.colors.textPrimary }]}>Elastic Habits</Text>
+          <Text style={[styles.headerTitle, { color: theme.colors.textPrimary }]}>{t('habits.title')}</Text>
           <Text style={[styles.headerSubtitle, { color: theme.colors.textMuted }]}>
-            Maintain streaks even on low energy days
+            {t('habits.subtitle')}
           </Text>
         </View>
 
@@ -108,20 +110,119 @@ export const HabitsScreen: React.FC = () => {
             setModalVisible(true);
           }}
         >
-          <Text style={styles.addBtnText}>+ Habit</Text>
+          <Text style={styles.addBtnText}>{t('habits.addBtn')}</Text>
         </TouchableOpacity>
       </View>
 
       <ScrollView contentContainerStyle={styles.listContent} showsVerticalScrollIndicator={false}>
-        {habits.map((habit) => (
-          <HabitCard
-            key={habit.id}
-            habit={habit}
-            todayLog={todayLogs[habit.id]}
-            onOpenBreathwork={() => setPacerVisible(true)}
-            onEdit={handleOpenEdit}
-          />
-        ))}
+        {habits.length === 0 ? (
+          <View
+            style={[
+              styles.emptyCard,
+              { backgroundColor: theme.colors.cardBackground, borderColor: theme.colors.cardBorder },
+            ]}
+          >
+            <Text style={styles.emptyIcon}>🌱</Text>
+            <Text style={[styles.emptyText, { color: theme.colors.textPrimary }]}>
+              {t('habits.emptyTitle')}
+            </Text>
+            <Text style={[styles.emptySubText, { color: theme.colors.textMuted }]}>
+              {t('habits.emptySubtitle')}
+            </Text>
+
+            <View style={styles.starterGrid}>
+              {[
+                {
+                  title: 'Morning Sunlight & Hydration',
+                  category: 'Health',
+                  icon: '☀️',
+                  elasticMini: '1 glass of water + step outside',
+                  elasticStandard: '10 min walk in sunlight',
+                  elasticPlus: '30 min brisk walk / stretch',
+                  energyLevel: 1 as EnergyLevel,
+                },
+                {
+                  title: 'Deep Reading & Synthesis',
+                  category: 'Learning',
+                  icon: '📚',
+                  elasticMini: 'Read 1 page of non-fiction',
+                  elasticStandard: 'Read 15 min & highlight',
+                  elasticPlus: '45 min reading + write notes',
+                  energyLevel: 2 as EnergyLevel,
+                },
+                {
+                  title: 'Evening Somatic Wind-down',
+                  category: 'Mindfulness',
+                  icon: '🧘',
+                  elasticMini: '2 min box breathing',
+                  elasticStandard: '10 min somatic stretch',
+                  elasticPlus: '25 min screen-free journal',
+                  energyLevel: 1 as EnergyLevel,
+                },
+              ].map((starter, idx) => (
+                <TouchableOpacity
+                  key={idx}
+                  style={[
+                    styles.starterCard,
+                    {
+                      backgroundColor: theme.colors.cardBackgroundElevated,
+                      borderColor: theme.colors.cardBorder,
+                    },
+                  ]}
+                  onPress={async () => {
+                    notificationEngine.triggerHaptic('success');
+                    await addHabit({
+                      title: starter.title,
+                      category: starter.category,
+                      frequencyType: 'daily',
+                      targetCount: 1,
+                      elasticMini: starter.elasticMini,
+                      elasticStandard: starter.elasticStandard,
+                      elasticPlus: starter.elasticPlus,
+                      energyLevel: starter.energyLevel,
+                    });
+                  }}
+                  activeOpacity={0.7}
+                >
+                  <View style={styles.starterCardHeader}>
+                    <View style={styles.starterTitleRow}>
+                      <Text style={styles.starterIcon}>{starter.icon}</Text>
+                      <View>
+                        <Text style={[styles.starterCardTitle, { color: theme.colors.textPrimary }]}>
+                          {starter.title}
+                        </Text>
+                        <Text style={[styles.starterCategory, { color: theme.colors.accent }]}>
+                          {starter.category}
+                        </Text>
+                      </View>
+                    </View>
+                    <Text style={[styles.starterAddAction, { color: theme.colors.accent }]}>+ Tap to Add</Text>
+                  </View>
+
+                  {/* Elastic Tiers Preview */}
+                  <View style={styles.tiersPreviewRow}>
+                    <Text style={[styles.tierPreviewPill, { color: theme.colors.energyLow, backgroundColor: theme.colors.energyLowBg }]}>
+                      Mini: {starter.elasticMini}
+                    </Text>
+                    <Text style={[styles.tierPreviewPill, { color: theme.colors.energyMed, backgroundColor: theme.colors.energyMedBg }]}>
+                      Std: {starter.elasticStandard}
+                    </Text>
+                  </View>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+        ) : (
+          habits.map((habit) => (
+            <HabitCard
+              key={habit.id}
+              habit={habit}
+              todayLog={todayLogs[habit.id]}
+              onOpenBreathwork={() => setPacerVisible(true)}
+              onEdit={handleOpenEdit}
+            />
+          ))
+        )}
       </ScrollView>
 
       {/* Create Habit Modal */}
@@ -461,6 +562,80 @@ const styles = StyleSheet.create({
   listContent: {
     padding: 16,
     paddingBottom: 60,
+  },
+  emptyCard: {
+    padding: 24,
+    borderRadius: 20,
+    borderWidth: 1,
+    alignItems: 'center',
+    marginTop: 10,
+  },
+  emptyIcon: {
+    fontSize: 32,
+    marginBottom: 6,
+  },
+  emptyText: {
+    fontSize: 16,
+    fontWeight: '700',
+    textAlign: 'center',
+  },
+  emptySubText: {
+    fontSize: 13,
+    marginTop: 4,
+    textAlign: 'center',
+    marginBottom: 16,
+    lineHeight: 18,
+  },
+  starterGrid: {
+    width: '100%',
+    gap: 12,
+    marginTop: 4,
+  },
+  starterCard: {
+    padding: 14,
+    borderRadius: 16,
+    borderWidth: 1,
+    width: '100%',
+  },
+  starterCardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 10,
+  },
+  starterTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    flex: 1,
+  },
+  starterIcon: {
+    fontSize: 24,
+  },
+  starterCardTitle: {
+    fontSize: 14.5,
+    fontWeight: '700',
+  },
+  starterCategory: {
+    fontSize: 11.5,
+    fontWeight: '600',
+    marginTop: 1,
+  },
+  starterAddAction: {
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  tiersPreviewRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+  },
+  tierPreviewPill: {
+    fontSize: 11,
+    fontWeight: '600',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
   },
   modalOverlay: {
     flex: 1,

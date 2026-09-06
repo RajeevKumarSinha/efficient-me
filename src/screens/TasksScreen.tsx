@@ -8,6 +8,7 @@ import {
   TextInput,
   Modal,
 } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { useThemeStore } from '../store/useThemeStore';
 import { useTaskStore } from '../store/useTaskStore';
 import { useGoalStore } from '../store/useGoalStore';
@@ -20,6 +21,7 @@ import { notificationEngine } from '../services/notifications/notificationEngine
 import { parseNaturalLanguageTask } from '../services/ai/naturalLanguageParser';
 
 export const TasksScreen: React.FC = () => {
+  const { t } = useTranslation();
   const { theme } = useThemeStore();
   const { tasks, loadTasks, addTask, updateTask } = useTaskStore();
   const { goals, loadGoals } = useGoalStore();
@@ -232,9 +234,9 @@ export const TasksScreen: React.FC = () => {
       {/* Header */}
       <View style={[styles.header, { borderBottomColor: theme.colors.cardBorder }]}>
         <View>
-          <Text style={[styles.headerTitle, { color: theme.colors.textPrimary }]}>Tasks & Chores</Text>
+          <Text style={[styles.headerTitle, { color: theme.colors.textPrimary }]}>{t('tasks.title')}</Text>
           <Text style={[styles.headerSubtitle, { color: theme.colors.textMuted }]}>
-            Categorized by energy output & lifecycles
+            {t('tasks.subtitle')}
           </Text>
         </View>
 
@@ -246,7 +248,7 @@ export const TasksScreen: React.FC = () => {
               setQuickCaptureVisible(true);
             }}
           >
-            <Text style={[styles.addBtnText, { color: theme.colors.accent }]}>⚡ AI Add</Text>
+            <Text style={[styles.addBtnText, { color: theme.colors.accent }]}>{t('tasks.aiAdd')}</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -256,7 +258,7 @@ export const TasksScreen: React.FC = () => {
               setModalVisible(true);
             }}
           >
-            <Text style={styles.addBtnText}>+ New</Text>
+            <Text style={styles.addBtnText}>{t('tasks.newBtn')}</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -272,7 +274,7 @@ export const TasksScreen: React.FC = () => {
           activeOpacity={0.75}
         >
           <Text style={[styles.toolActionBtnText, { color: theme.colors.accent }]}>
-            ⚡ Optimize Circadian Schedule
+            {t('tasks.optimizeSchedule')}
           </Text>
         </TouchableOpacity>
 
@@ -286,7 +288,7 @@ export const TasksScreen: React.FC = () => {
           activeOpacity={0.75}
         >
           <Text style={[styles.toolActionBtnText, { color: theme.colors.textPrimary }]}>
-            ⏱️ Focus Timer
+            {t('tasks.focusTimer')}
           </Text>
         </TouchableOpacity>
       </View>
@@ -295,11 +297,11 @@ export const TasksScreen: React.FC = () => {
       <View style={styles.filterBar}>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterScroll}>
           {[
-            { key: 'all', label: 'All Tasks' },
-            { key: 'low', label: '🍃 1⚡ Low' },
-            { key: 'med', label: '⚡ 2⚡ Med' },
-            { key: 'high', label: '🔥 3⚡ High' },
-            { key: 'chores', label: '🧹 Chores' },
+            { key: 'all', label: t('tasks.all') },
+            { key: 'low', label: t('tasks.filterLow') },
+            { key: 'med', label: t('tasks.filterMed') },
+            { key: 'high', label: t('tasks.filterHigh') },
+            { key: 'chores', label: t('tasks.filterChores') },
           ].map((tab) => {
             const isActive = activeFilter === tab.key;
             return (
@@ -342,10 +344,110 @@ export const TasksScreen: React.FC = () => {
               { backgroundColor: theme.colors.cardBackground, borderColor: theme.colors.cardBorder },
             ]}
           >
-            <Text style={styles.emptyIcon}>📝</Text>
+            <Text style={styles.emptyIcon}>✨</Text>
             <Text style={[styles.emptyText, { color: theme.colors.textPrimary }]}>
-              No tasks in this category.
+              {tasks.length === 0 ? t('tasks.emptyZeroTasks') : t('tasks.emptyNoTasks')}
             </Text>
+            <Text style={[styles.emptySubText, { color: theme.colors.textMuted }]}>
+              {tasks.length === 0 ? t('tasks.emptyStartersSub') : t('tasks.subtitle')}
+            </Text>
+
+            {tasks.length === 0 && (
+              <View style={styles.starterGrid}>
+                {[
+                  {
+                    title: 'Review quarterly roadmap & strategic goals',
+                    energyLevel: 3 as EnergyLevel,
+                    priority: 'P1' as Priority,
+                    icon: '⚡',
+                    badge: '3⚡ Peak Focus',
+                    badgeColor: '#F59E0B',
+                    dueOffset: 1,
+                  },
+                  {
+                    title: 'Clear inbox & archive processed notes',
+                    energyLevel: 1 as EnergyLevel,
+                    priority: 'P3' as Priority,
+                    icon: '🍃',
+                    badge: '1⚡ Gentle',
+                    badgeColor: '#10B981',
+                    dueOffset: 0,
+                  },
+                  {
+                    title: 'Water house plants & desk reset',
+                    energyLevel: 1 as EnergyLevel,
+                    priority: 'P3' as Priority,
+                    icon: '🧹',
+                    badge: 'Daily Chore',
+                    badgeColor: '#3B82F6',
+                    isRecurringChore: true,
+                    choreCadence: 'daily' as const,
+                    dueOffset: 0,
+                  },
+                  {
+                    title: "Alex's Birthday Celebration",
+                    energyLevel: 1 as EnergyLevel,
+                    priority: 'P1' as Priority,
+                    icon: '🎂',
+                    badge: 'Celebration',
+                    badgeColor: '#EC4899',
+                    isEscalatingBirthday: true,
+                    dueOffset: 5,
+                  },
+                ].map((starter, idx) => {
+                  const targetD = new Date();
+                  targetD.setDate(targetD.getDate() + starter.dueOffset);
+                  const y = targetD.getFullYear();
+                  const m = String(targetD.getMonth() + 1).padStart(2, '0');
+                  const d = String(targetD.getDate()).padStart(2, '0');
+                  const dateStr = `${y}-${m}-${d}`;
+
+                  return (
+                    <TouchableOpacity
+                      key={idx}
+                      style={[
+                        styles.starterChip,
+                        {
+                          backgroundColor: theme.colors.cardBackgroundElevated,
+                          borderColor: theme.colors.cardBorder,
+                        },
+                      ]}
+                      onPress={async () => {
+                        notificationEngine.triggerHaptic('success');
+                        await addTask({
+                          title: starter.title,
+                          status: 'pending',
+                          energyLevel: starter.energyLevel,
+                          priority: starter.priority,
+                          dueDate: dateStr,
+                          isRecurringChore: starter.isRecurringChore,
+                          choreCadence: starter.choreCadence,
+                          isEscalatingBirthday: starter.isEscalatingBirthday,
+                        });
+                      }}
+                      activeOpacity={0.7}
+                    >
+                      <View style={styles.starterTop}>
+                        <View
+                          style={[
+                            styles.starterBadge,
+                            { backgroundColor: starter.badgeColor + '20', borderColor: starter.badgeColor + '40' },
+                          ]}
+                        >
+                          <Text style={[styles.starterBadgeText, { color: starter.badgeColor }]}>
+                            {starter.icon} {starter.badge}
+                          </Text>
+                        </View>
+                        <Text style={[styles.starterPlus, { color: theme.colors.accent }]}>+ Tap to Add</Text>
+                      </View>
+                      <Text style={[styles.starterTitle, { color: theme.colors.textPrimary }]}>
+                        {starter.title}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            )}
           </View>
         ) : (
           filteredTasks.map((task) => (
@@ -1119,19 +1221,62 @@ const styles = StyleSheet.create({
     paddingBottom: 60,
   },
   emptyCard: {
-    padding: 30,
-    borderRadius: 16,
+    padding: 24,
+    borderRadius: 20,
     borderWidth: 1,
     alignItems: 'center',
-    marginTop: 20,
+    marginTop: 10,
   },
   emptyIcon: {
     fontSize: 32,
-    marginBottom: 8,
+    marginBottom: 6,
   },
   emptyText: {
+    fontSize: 16,
+    fontWeight: '700',
+    textAlign: 'center',
+  },
+  emptySubText: {
+    fontSize: 13,
+    marginTop: 4,
+    textAlign: 'center',
+    marginBottom: 16,
+  },
+  starterGrid: {
+    width: '100%',
+    gap: 10,
+    marginTop: 4,
+  },
+  starterChip: {
+    padding: 14,
+    borderRadius: 16,
+    borderWidth: 1,
+    width: '100%',
+  },
+  starterTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  starterBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 100,
+    borderWidth: 1,
+  },
+  starterBadgeText: {
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  starterPlus: {
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  starterTitle: {
     fontSize: 14,
     fontWeight: '600',
+    lineHeight: 19,
   },
   modalOverlay: {
     flex: 1,

@@ -51,3 +51,17 @@ export async function initializeDatabase(): Promise<void> {
     throw error;
   }
 }
+
+export async function clearAllData(): Promise<void> {
+  const db = await getDatabase();
+  await db.execAsync(`
+    DELETE FROM habit_logs;
+    DELETE FROM habits;
+    DELETE FROM tasks;
+    DELETE FROM goals;
+    DELETE FROM energy_logs;
+    DELETE FROM notification_rules;
+  `);
+  console.log('[Database] All user data cleared successfully.');
+}
+

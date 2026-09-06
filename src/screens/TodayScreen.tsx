@@ -8,6 +8,7 @@ import {
   RefreshControl,
   Image,
 } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { useThemeStore } from '../store/useThemeStore';
 import { useTaskStore } from '../store/useTaskStore';
 import { useHabitStore } from '../store/useHabitStore';
@@ -20,13 +21,16 @@ import { SomaticPacerModal } from '../components/SomaticPacerModal';
 import { FocusTimerModal } from '../components/FocusTimerModal';
 import { ScheduleOptimizerModal } from '../components/ScheduleOptimizerModal';
 import { QuickCaptureModal } from '../components/QuickCaptureModal';
+import { SettingsModal } from '../components/SettingsModal';
+import { OnboardingModal } from '../components/OnboardingModal';
 import { notificationEngine } from '../services/notifications/notificationEngine';
 
 import { Task } from '../types';
 
 export const TodayScreen: React.FC = () => {
+  const { t } = useTranslation();
   const { theme, isDarkMode, toggleTheme } = useThemeStore();
-  const { tasks, loadTasks } = useTaskStore();
+  const { tasks, loadTasks, addTask } = useTaskStore();
   const { habits, todayLogs, loadHabits } = useHabitStore();
   const { todayCheckIn, isLowEnergyMode, loadTodayCheckIn } = useEnergyStore();
 
@@ -36,6 +40,8 @@ export const TodayScreen: React.FC = () => {
   const [selectedTaskForTimer, setSelectedTaskForTimer] = useState<Task | null>(null);
   const [optimizerVisible, setOptimizerVisible] = useState(false);
   const [quickCaptureVisible, setQuickCaptureVisible] = useState(false);
+  const [settingsVisible, setSettingsVisible] = useState(false);
+  const [onboardingReplayVisible, setOnboardingReplayVisible] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
@@ -113,7 +119,7 @@ export const TodayScreen: React.FC = () => {
             }}
             activeOpacity={0.8}
           >
-            <Text style={styles.quickAddBtnText}>+ Quick Add</Text>
+            <Text style={styles.quickAddBtnText}>{t('today.quickAdd')}</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -121,9 +127,13 @@ export const TodayScreen: React.FC = () => {
               styles.themeToggle,
               { backgroundColor: theme.colors.cardBackground, borderColor: theme.colors.cardBorder },
             ]}
-            onPress={toggleTheme}
+            onPress={() => {
+              notificationEngine.triggerHaptic('light');
+              setSettingsVisible(true);
+            }}
+            activeOpacity={0.8}
           >
-            <Text style={{ fontSize: 16 }}>{isDarkMode ? '☀️' : '🌙'}</Text>
+            <Text style={{ fontSize: 16 }}>⚙️</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -158,7 +168,7 @@ export const TodayScreen: React.FC = () => {
           <View style={styles.energyCardTop}>
             <View>
               <Text style={[styles.energyCardTitle, { color: theme.colors.textPrimary }]}>
-                {todayCheckIn ? 'Today’s Energy State' : 'Energy Check-In Pending'}
+                {todayCheckIn ? 'Today’s Energy State' : t('today.energyPrompt')}
               </Text>
               <Text style={[styles.energyCardSubtitle, { color: theme.colors.textMuted }]}>
                 {todayCheckIn
@@ -235,7 +245,7 @@ export const TodayScreen: React.FC = () => {
           >
             <Text style={styles.toolIcon}>⏱️</Text>
             <Text style={[styles.toolLabel, { color: theme.colors.textPrimary }]}>
-              Focus Sprint
+              {t('today.focusSprint')}
             </Text>
           </TouchableOpacity>
 
@@ -252,7 +262,7 @@ export const TodayScreen: React.FC = () => {
           >
             <Text style={styles.toolIcon}>⚡</Text>
             <Text style={[styles.toolLabel, { color: theme.colors.accent }]}>
-              Optimize Day
+              {t('today.optimizeDay')}
             </Text>
           </TouchableOpacity>
         </View>
@@ -266,7 +276,7 @@ export const TodayScreen: React.FC = () => {
             ]}
           >
             <Text style={[styles.statNum, { color: theme.colors.accent }]}>{pendingCount}</Text>
-            <Text style={[styles.statLabel, { color: theme.colors.textMuted }]}>Tasks Due</Text>
+            <Text style={[styles.statLabel, { color: theme.colors.textMuted }]}>{t('today.statsTasksDue')}</Text>
           </View>
           <View
             style={[
@@ -275,7 +285,7 @@ export const TodayScreen: React.FC = () => {
             ]}
           >
             <Text style={[styles.statNum, { color: theme.colors.success }]}>{completedCount}</Text>
-            <Text style={[styles.statLabel, { color: theme.colors.textMuted }]}>Completed</Text>
+            <Text style={[styles.statLabel, { color: theme.colors.textMuted }]}>{t('today.statsCompleted')}</Text>
           </View>
           <View
             style={[
@@ -286,17 +296,17 @@ export const TodayScreen: React.FC = () => {
             <Text style={[styles.statNum, { color: theme.colors.energyHigh }]}>
               {Object.keys(todayLogs).length}/{habits.length}
             </Text>
-            <Text style={[styles.statLabel, { color: theme.colors.textMuted }]}>Habits Done</Text>
+            <Text style={[styles.statLabel, { color: theme.colors.textMuted }]}>{t('today.statsHabitsDone')}</Text>
           </View>
         </View>
 
         {/* Elastic Habits Section */}
         <View style={styles.sectionHeader}>
           <Text style={[styles.sectionTitle, { color: theme.colors.textPrimary }]}>
-            Daily Elastic Habits
+            {t('today.todayHabits')}
           </Text>
           <Text style={[styles.sectionSub, { color: theme.colors.textMuted }]}>
-            Pick Mini, Standard, or Plus based on energy
+            {t('today.habitsSub')}
           </Text>
         </View>
 
@@ -312,12 +322,12 @@ export const TodayScreen: React.FC = () => {
         {/* Tasks Section */}
         <View style={[styles.sectionHeader, { marginTop: 14 }]}>
           <Text style={[styles.sectionTitle, { color: theme.colors.textPrimary }]}>
-            {isLowEnergyMode ? 'Gentle Energy Tasks' : 'Priority Tasks'}
+            {isLowEnergyMode ? 'Gentle Energy Tasks' : t('today.todayTasks')}
           </Text>
           <Text style={[styles.sectionSub, { color: theme.colors.textMuted }]}>
             {isLowEnergyMode
               ? 'High-intensity tasks paused for recovery'
-              : 'Sorted by energy match & priority'}
+              : t('today.tasksSub')}
           </Text>
         </View>
 
@@ -330,10 +340,10 @@ export const TodayScreen: React.FC = () => {
           >
             <Text style={styles.emptyIcon}>🎉</Text>
             <Text style={[styles.emptyTitle, { color: theme.colors.textPrimary }]}>
-              All tasks cleared!
+              {t('today.allTasksCleared')}
             </Text>
             <Text style={[styles.emptySubtitle, { color: theme.colors.textMuted }]}>
-              Enjoy your free time or add a restorative activity.
+              {t('today.tasksClearedSub')}
             </Text>
           </View>
         ) : (
@@ -376,6 +386,19 @@ export const TodayScreen: React.FC = () => {
       <QuickCaptureModal
         visible={quickCaptureVisible}
         onClose={() => setQuickCaptureVisible(false)}
+      />
+
+      {/* App Settings Modal */}
+      <SettingsModal
+        visible={settingsVisible}
+        onClose={() => setSettingsVisible(false)}
+        onReplayOnboarding={() => setOnboardingReplayVisible(true)}
+      />
+
+      {/* Onboarding Replay Modal */}
+      <OnboardingModal
+        visible={onboardingReplayVisible}
+        onComplete={() => setOnboardingReplayVisible(false)}
       />
     </View>
   );
