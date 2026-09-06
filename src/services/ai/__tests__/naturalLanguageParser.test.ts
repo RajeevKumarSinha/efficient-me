@@ -119,15 +119,16 @@ describe('Natural Language Task Parser', () => {
 
   describe('Relative Dates', () => {
     it('should detect today and tomorrow', () => {
-      const today = new Date().toISOString().split('T')[0];
+      const now = new Date();
+      const localToday = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
       const resToday = parseNaturalLanguageTask('Submit report today');
-      expect(resToday.dueDate).toBe(today);
+      expect(resToday.dueDate).toBe(localToday);
 
-      const tomorrow = new Date();
+      const tomorrow = new Date(now);
       tomorrow.setDate(tomorrow.getDate() + 1);
-      const tomorrowIso = tomorrow.toISOString().split('T')[0];
+      const localTomorrow = `${tomorrow.getFullYear()}-${String(tomorrow.getMonth() + 1).padStart(2, '0')}-${String(tomorrow.getDate()).padStart(2, '0')}`;
       const resTomorrow = parseNaturalLanguageTask('Prepare presentation tomorrow');
-      expect(resTomorrow.dueDate).toBe(tomorrowIso);
+      expect(resTomorrow.dueDate).toBe(localTomorrow);
     });
 
     it('should detect relative days of week', () => {

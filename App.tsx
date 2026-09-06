@@ -15,16 +15,20 @@ import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-cont
 import * as NavigationBar from 'expo-navigation-bar';
 
 LogBox.ignoreAllLogs();
+import { useTranslation } from 'react-i18next';
 import { initializeDatabase } from './src/database/db';
+import { initI18n } from './src/locales/i18n';
 import { notificationEngine } from './src/services/notifications/notificationEngine';
 import { useThemeStore } from './src/store/useThemeStore';
 import { useTaskStore } from './src/store/useTaskStore';
+import { useLanguageStore } from './src/store/useLanguageStore';
 import { TodayScreen } from './src/screens/TodayScreen';
 import { TasksScreen } from './src/screens/TasksScreen';
 import { HabitsScreen } from './src/screens/HabitsScreen';
 import { GoalsScreen } from './src/screens/GoalsScreen';
 import { AnalyticsScreen } from './src/screens/AnalyticsScreen';
 import { taskRepository } from './src/database/repositories/taskRepository';
+import { OnboardingModal, checkHasCompletedOnboarding } from './src/components/OnboardingModal';
 
 type TabType = 'today' | 'tasks' | 'habits' | 'goals' | 'insights';
 
@@ -50,8 +54,11 @@ async function configureAndroidImmersiveMode(tabBgColor: string, isDark: boolean
 function MainApp() {
   const { theme, isDarkMode } = useThemeStore();
   const { loadTasks } = useTaskStore();
+  const { currentLanguage } = useLanguageStore();
+  const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState<TabType>('today');
   const [isReady, setIsReady] = useState(false);
+  const [showOnboarding, setShowOnboarding] = useState(false);
   const insets = useSafeAreaInsets();
 
   useEffect(() => {
@@ -60,8 +67,14 @@ function MainApp() {
     async function prepare() {
       try {
         await initializeDatabase();
+        await initI18n();
         await notificationEngine.init();
         await notificationEngine.scheduleDailyCircadianCheckIn();
+
+        const hasCompleted = await checkHasCompletedOnboarding();
+        if (!hasCompleted) {
+          setShowOnboarding(true);
+        }
 
         // Register interactive notification action handlers
         sub = notificationEngine.registerResponseHandler({
@@ -144,11 +157,11 @@ function MainApp() {
   };
 
   const tabs: { key: TabType; label: string; icon: string }[] = [
-    { key: 'today', label: 'Today', icon: '⚡' },
-    { key: 'tasks', label: 'Tasks', icon: '📋' },
-    { key: 'habits', label: 'Habits', icon: '🌱' },
-    { key: 'goals', label: 'Goals', icon: '🎯' },
-    { key: 'insights', label: 'Insights', icon: '📊' },
+    { key: 'today', label: t('tabs.today'), icon: '⚡' },
+    { key: 'tasks', label: t('tabs.tasks'), icon: '📋' },
+    { key: 'habits', label: t('tabs.habits'), icon: '🌱' },
+    { key: 'goals', label: t('tabs.goals'), icon: '🎯' },
+    { key: 'insights', label: t('tabs.insights'), icon: '📊' },
   ];
 
   return (
@@ -199,6 +212,12 @@ function MainApp() {
           );
         })}
       </View>
+
+      {/* 1-Time Interactive Onboarding Tutorial */}
+      <OnboardingModal
+        visible={showOnboarding}
+        onComplete={() => setShowOnboarding(false)}
+      />
     </View>
   );
 }

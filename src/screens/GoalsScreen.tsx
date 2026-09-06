@@ -9,6 +9,7 @@ import {
   Modal,
   Alert,
 } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { useThemeStore } from '../store/useThemeStore';
 import { useGoalStore } from '../store/useGoalStore';
 import { Goal } from '../types';
@@ -18,6 +19,7 @@ const GOAL_COLORS = ['#6366F1', '#10B981', '#F59E0B', '#EC4899', '#3B82F6', '#8B
 const GOAL_ICONS = ['🎯', '⚡', '🌱', '🚀', '🧠', '💼', '🏆', '📚'];
 
 export const GoalsScreen: React.FC = () => {
+  const { t } = useTranslation();
   const { theme } = useThemeStore();
   const { goals, loadGoals, addGoal, updateGoal, deleteGoal } = useGoalStore();
 
@@ -108,10 +110,10 @@ export const GoalsScreen: React.FC = () => {
       <View style={[styles.header, { borderBottomColor: theme.colors.cardBorder }]}>
         <View>
           <Text style={[styles.headerTitle, { color: theme.colors.textPrimary }]}>
-            Goals & Milestones (OKRs)
+            {t('goals.title')}
           </Text>
           <Text style={[styles.headerSubtitle, { color: theme.colors.textMuted }]}>
-            Long-term objectives driven by your daily tasks & habits
+            {t('goals.subtitle')}
           </Text>
         </View>
 
@@ -120,7 +122,7 @@ export const GoalsScreen: React.FC = () => {
           onPress={openCreateModal}
           activeOpacity={0.8}
         >
-          <Text style={styles.addBtnText}>+ Goal</Text>
+          <Text style={styles.addBtnText}>{t('goals.addBtn')}</Text>
         </TouchableOpacity>
       </View>
 
@@ -134,17 +136,83 @@ export const GoalsScreen: React.FC = () => {
           >
             <Text style={styles.emptyIcon}>🎯</Text>
             <Text style={[styles.emptyTitle, { color: theme.colors.textPrimary }]}>
-              No Goals Defined Yet
+              {t('goals.emptyTitle')}
             </Text>
             <Text style={[styles.emptySubtitle, { color: theme.colors.textMuted }]}>
-              Connect your daily tasks and elastic habits to long-term milestones to track visual progress.
+              {t('goals.emptySubtitle')}
             </Text>
+
+            {/* Starter Goal Templates */}
+            <View style={{ width: '100%', gap: 10, marginTop: 14, marginBottom: 14 }}>
+              {[
+                {
+                  title: 'Launch Efficient Me MVP v1.0',
+                  description: 'Publish production release with offline SQLite and circadian scheduling',
+                  color: '#6366F1',
+                  icon: '🚀',
+                  targetDays: 30,
+                },
+                {
+                  title: '30-Day Circadian & Habit Streak',
+                  description: 'Achieve 30 consecutive days of energy check-ins and Mini/Standard habit completions',
+                  color: '#10B981',
+                  icon: '⚡',
+                  targetDays: 60,
+                },
+              ].map((starter, idx) => {
+                const target = new Date();
+                target.setDate(target.getDate() + starter.targetDays);
+                const targetDateStr = target.toISOString().split('T')[0];
+
+                return (
+                  <TouchableOpacity
+                    key={idx}
+                    style={{
+                      backgroundColor: theme.colors.cardBackgroundElevated,
+                      borderColor: theme.colors.cardBorder,
+                      borderWidth: 1,
+                      borderRadius: 14,
+                      padding: 12,
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                    }}
+                    onPress={async () => {
+                      notificationEngine.triggerHaptic('success');
+                      await addGoal({
+                        title: starter.title,
+                        description: starter.description,
+                        targetDate: targetDateStr,
+                        color: starter.color,
+                        icon: starter.icon,
+                        status: 'active',
+                      });
+                    }}
+                    activeOpacity={0.7}
+                  >
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 }}>
+                      <Text style={{ fontSize: 24 }}>{starter.icon}</Text>
+                      <View style={{ flex: 1 }}>
+                        <Text style={{ color: theme.colors.textPrimary, fontWeight: '700', fontSize: 13.5 }}>
+                          {starter.title}
+                        </Text>
+                        <Text style={{ color: theme.colors.textMuted, fontSize: 11.5, marginTop: 2 }}>
+                          📅 Target: in {starter.targetDays} days
+                        </Text>
+                      </View>
+                    </View>
+                    <Text style={{ color: theme.colors.accent, fontWeight: '700', fontSize: 12 }}>+ Add</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+
             <TouchableOpacity
               style={[styles.emptyCta, { backgroundColor: theme.colors.accent }]}
               onPress={openCreateModal}
               activeOpacity={0.8}
             >
-              <Text style={styles.emptyCtaText}>+ Create Your First Goal</Text>
+              <Text style={styles.emptyCtaText}>{t('goals.customMilestoneBtn')}</Text>
             </TouchableOpacity>
           </View>
         ) : (

@@ -8,11 +8,14 @@ import {
   Alert,
   ActivityIndicator,
 } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { useThemeStore } from '../store/useThemeStore';
 import { useEnergyStore } from '../store/useEnergyStore';
 import { useTaskStore } from '../store/useTaskStore';
 import { useHabitStore } from '../store/useHabitStore';
 import { useGoalStore } from '../store/useGoalStore';
+import { useLanguageStore } from '../store/useLanguageStore';
+import { SUPPORTED_LANGUAGES } from '../locales/i18n';
 import { notificationEngine } from '../services/notifications/notificationEngine';
 import { dataExportService } from '../services/export/dataExportService';
 import {
@@ -24,9 +27,12 @@ import { ChronotypeQuizModal } from '../components/ChronotypeQuizModal';
 import { RoutineMarketplaceModal } from '../components/RoutineMarketplaceModal';
 import { WeeklyRetroModal } from '../components/WeeklyRetroModal';
 import { BackupRestoreModal } from '../components/BackupRestoreModal';
+import { LanguageSelectorModal } from '../components/LanguageSelectorModal';
 
 export const AnalyticsScreen: React.FC = () => {
   const { theme } = useThemeStore();
+  const { t } = useTranslation();
+  const { currentLanguage } = useLanguageStore();
   const { recentLogs, todayCheckIn, loadTodayCheckIn } = useEnergyStore();
   const { tasks, loadTasks } = useTaskStore();
   const { habits, todayLogs, loadHabits } = useHabitStore();
@@ -39,6 +45,7 @@ export const AnalyticsScreen: React.FC = () => {
   const [marketplaceVisible, setMarketplaceVisible] = useState(false);
   const [retroVisible, setRetroVisible] = useState(false);
   const [backupModalVisible, setBackupModalVisible] = useState(false);
+  const [langModalVisible, setLangModalVisible] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
 
   useEffect(() => {
@@ -112,7 +119,7 @@ export const AnalyticsScreen: React.FC = () => {
       {/* Header */}
       <View style={[styles.header, { borderBottomColor: theme.colors.cardBorder }]}>
         <Text style={[styles.headerTitle, { color: theme.colors.textPrimary }]}>
-          Insights & Intelligence
+          {t('analytics.title')}
         </Text>
         <Text style={[styles.headerSubtitle, { color: theme.colors.textMuted }]}>
           Energy correlations, chronotypes, and data sovereignty
@@ -139,7 +146,7 @@ export const AnalyticsScreen: React.FC = () => {
             <Text style={styles.bannerIcon}>✨</Text>
             <View>
               <Text style={[styles.bannerTitle, { color: theme.colors.accent }]}>
-                Routine Marketplace
+                {t('analytics.routineMarketplace')}
               </Text>
               <Text style={[styles.bannerSub, { color: theme.colors.textSecondary }]}>
                 Install ADHD, Deep Work & Recovery packs with 1-tap
@@ -354,7 +361,43 @@ export const AnalyticsScreen: React.FC = () => {
             </TouchableOpacity>
           </View>
         </View>
+
+        {/* Global Language & App Preferences Card */}
+        <View
+          style={[
+            styles.card,
+            { backgroundColor: theme.colors.cardBackground, borderColor: theme.colors.cardBorder },
+          ]}
+        >
+          <View style={styles.cardHeader}>
+            <Text style={[styles.cardTitle, { color: theme.colors.textPrimary }]}>
+              🌐 {t('settings.language')} & {t('settings.title')}
+            </Text>
+            <TouchableOpacity
+              style={[styles.quizPill, { backgroundColor: theme.colors.accentLight }]}
+              onPress={() => {
+                notificationEngine.triggerHaptic('light');
+                setLangModalVisible(true);
+              }}
+            >
+              <Text style={[styles.quizPillText, { color: theme.colors.accent }]}>
+                {SUPPORTED_LANGUAGES.find((l) => l.code === currentLanguage)?.flag || '🌐'}{' '}
+                {SUPPORTED_LANGUAGES.find((l) => l.code === currentLanguage)?.nativeName || 'English'} ➔
+              </Text>
+            </TouchableOpacity>
+          </View>
+
+          <Text style={[styles.cardDesc, { color: theme.colors.textSecondary }]}>
+            {t('settings.privacy')}
+          </Text>
+        </View>
       </ScrollView>
+
+      {/* Language Selector Modal */}
+      <LanguageSelectorModal
+        visible={langModalVisible}
+        onClose={() => setLangModalVisible(false)}
+      />
 
       {/* Chronotype Quiz Modal */}
       <ChronotypeQuizModal
