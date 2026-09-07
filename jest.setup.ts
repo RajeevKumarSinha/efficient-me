@@ -16,6 +16,7 @@ if (!global.fetch) {
 export class MockDatabase {
   public tables: Record<string, any[]> = {
     tasks: [],
+    task_completions: [],
     habits: [],
     habit_logs: [],
     goals: [],
@@ -28,6 +29,24 @@ export class MockDatabase {
 
   async runAsync(sql: string, params: any[] = []): Promise<{ lastInsertRowId: number; changes: number }> {
     const trimmed = sql.trim().toUpperCase();
+
+    if (trimmed.startsWith('INSERT') && trimmed.includes('TASK_COMPLETIONS')) {
+      const completion = {
+        id: params[0],
+        task_id: params[1],
+        completed_date: params[2],
+        created_at: params[3],
+      };
+      const existingIdx = this.tables.task_completions.findIndex(
+        (c) => c.task_id === completion.task_id && c.completed_date === completion.completed_date
+      );
+      if (existingIdx >= 0) {
+        this.tables.task_completions[existingIdx] = completion;
+      } else {
+        this.tables.task_completions.push(completion);
+      }
+      return { lastInsertRowId: this.tables.task_completions.length, changes: 1 };
+    }
 
     if (trimmed.startsWith('INSERT INTO TASKS')) {
       const task = {
@@ -123,13 +142,28 @@ export class MockDatabase {
       const id = params[params.length - 1];
       const taskIndex = this.tables.tasks.findIndex((t) => t.id === id);
       if (taskIndex >= 0) {
-        if (trimmed.includes('STATUS = ?')) {
-          this.tables.tasks[taskIndex].status = params[0];
-          this.tables.tasks[taskIndex].completed_at = params[1];
-          this.tables.tasks[taskIndex].updated_at = params[2];
-        } else if (trimmed.includes('DUE_DATE = ?')) {
-          this.tables.tasks[taskIndex].due_date = params[0];
-          this.tables.tasks[taskIndex].updated_at = params[1];
+        const task = this.tables.tasks[taskIndex];
+        if (trimmed.includes("STATUS = 'PENDING'")) {
+          task.status = 'pending';
+        } else if (trimmed.includes("STATUS = 'COMPLETED'")) {
+          task.status = 'completed';
+        } else if (trimmed.includes('STATUS = ?')) {
+          task.status = params[0];
+        }
+
+        if (trimmed.includes('DUE_DATE = ?')) {
+          // If status = ?, due_date is param index 1, otherwise param index 0
+          const dueIndex = trimmed.includes('STATUS = ?') ? 1 : 0;
+          task.due_date = params[dueIndex];
+        }
+
+        if (trimmed.includes('COMPLETED_AT = NULL')) {
+          task.completed_at = null;
+        } else if (trimmed.includes('COMPLETED_AT = ?')) {
+          const compIndex = params.length - 3;
+          if (compIndex >= 0) {
+            task.completed_at = params[compIndex];
+          }
         }
         return { lastInsertRowId: 0, changes: 1 };
       }
@@ -144,6 +178,22 @@ export class MockDatabase {
         }
         return { lastInsertRowId: 0, changes: 1 };
       }
+    }
+
+    if (trimmed.startsWith('DELETE FROM TASK_COMPLETIONS')) {
+      if (params.length === 2) {
+        // task_id, completed_date
+        this.tables.task_completions = this.tables.task_completions.filter(
+          (c) => !(c.task_id === params[0] && c.completed_date === params[1])
+        );
+      } else if (params.length === 1) {
+        this.tables.task_completions = this.tables.task_completions.filter(
+          (c) => c.task_id !== params[0]
+        );
+      } else {
+        this.tables.task_completions = [];
+      }
+      return { lastInsertRowId: 0, changes: 1 };
     }
 
     if (trimmed.startsWith('DELETE FROM TASKS')) {
@@ -173,8 +223,26 @@ export class MockDatabase {
   async getAllAsync<T = any>(sql: string, params: any[] = []): Promise<T[]> {
     const trimmed = sql.trim().toUpperCase();
 
+    if (trimmed.includes('FROM TASK_COMPLETIONS')) {
+      let result = [...this.tables.task_completions];
+      if (params.length === 1) {
+        result = result.filter((c) => c.task_id === params[0]);
+      } else if (params.length === 2) {
+        result = result.filter((c) => c.task_id === params[0] && c.completed_date === params[1]);
+      }
+      if (trimmed.includes('ORDER BY COMPLETED_DATE ASC')) {
+        result.sort((a, b) => (a.completed_date || '').localeCompare(b.completed_date || ''));
+      } else if (trimmed.includes('ORDER BY COMPLETED_DATE DESC')) {
+        result.sort((a, b) => (b.completed_date || '').localeCompare(a.completed_date || ''));
+      }
+      return result as unknown as T[];
+    }
+
     if (trimmed.includes('FROM TASKS')) {
       let result = [...this.tables.tasks];
+      if (trimmed.includes('WHERE ID = ?') || trimmed.includes('ID = ?')) {
+        result = result.filter((t) => t.id === params[0]);
+      }
       if (trimmed.includes("STATUS != 'CANCELLED'")) {
         result = result.filter((t) => t.status !== 'cancelled');
       }
@@ -192,6 +260,9 @@ export class MockDatabase {
 
     if (trimmed.includes('FROM HABITS')) {
       let result = [...this.tables.habits];
+      if (trimmed.includes('WHERE ID = ?') || trimmed.includes('ID = ?')) {
+        result = result.filter((h) => h.id === params[0]);
+      }
       if (trimmed.includes('IS_ARCHIVED = 0')) {
         result = result.filter((h) => !h.is_archived);
       }
@@ -210,7 +281,11 @@ export class MockDatabase {
     }
 
     if (trimmed.includes('FROM GOALS')) {
-      return [...this.tables.goals] as unknown as T[];
+      let result = [...this.tables.goals];
+      if (trimmed.includes('WHERE ID = ?') || trimmed.includes('ID = ?')) {
+        result = result.filter((g) => g.id === params[0]);
+      }
+      return result as unknown as T[];
     }
 
     if (trimmed.includes('FROM ENERGY_LOGS')) {

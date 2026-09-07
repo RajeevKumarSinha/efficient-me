@@ -23,6 +23,7 @@ import { ScheduleOptimizerModal } from '../components/ScheduleOptimizerModal';
 import { QuickCaptureModal } from '../components/QuickCaptureModal';
 import { SettingsModal } from '../components/SettingsModal';
 import { OnboardingModal } from '../components/OnboardingModal';
+import { TaskCalendarModal } from '../components/TaskCalendarModal';
 import { notificationEngine } from '../services/notifications/notificationEngine';
 
 import { Task } from '../types';
@@ -42,6 +43,7 @@ export const TodayScreen: React.FC = () => {
   const [quickCaptureVisible, setQuickCaptureVisible] = useState(false);
   const [settingsVisible, setSettingsVisible] = useState(false);
   const [onboardingReplayVisible, setOnboardingReplayVisible] = useState(false);
+  const [calendarTask, setCalendarTask] = useState<Task | null>(null);
   const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
@@ -66,9 +68,17 @@ export const TodayScreen: React.FC = () => {
 
   const todayIso = new Date().toISOString().split('T')[0];
 
-  // Filter tasks for today based on due date and Low Energy Mode
+  // Filter tasks for today based on due date, recurring completions, and Low Energy Mode
   const todayTasks = tasks.filter((t) => {
-    // If task is scheduled for a future date, do not show in Today view
+    const isRecurring = Boolean(t.isRecurringChore);
+    const completedToday = Boolean(t.completedAt && t.completedAt.startsWith(todayIso));
+
+    // If recurring task was completed today, show it in today's completed section
+    if (isRecurring && completedToday) {
+      return true;
+    }
+
+    // If task is scheduled for a future date and not completed today, do not show in Today view
     if (t.dueDate && t.dueDate > todayIso && t.status !== 'completed') {
       return false;
     }
@@ -102,7 +112,7 @@ export const TodayScreen: React.FC = () => {
           <View>
             <Text style={[styles.dateSubtitle, { color: theme.colors.textMuted }]}>{todayStr}</Text>
             <Text style={[styles.headerTitle, { color: theme.colors.textPrimary }]}>
-              Efficient Me
+              {t('today.headerTitle')}
             </Text>
           </View>
         </View>
@@ -355,6 +365,9 @@ export const TodayScreen: React.FC = () => {
                 setSelectedTaskForTimer(t);
                 setFocusTimerVisible(true);
               }}
+              onOpenCalendar={(t) => {
+                setCalendarTask(t);
+              }}
             />
           ))
         )}
@@ -399,6 +412,13 @@ export const TodayScreen: React.FC = () => {
       <OnboardingModal
         visible={onboardingReplayVisible}
         onComplete={() => setOnboardingReplayVisible(false)}
+      />
+
+      {/* Task & Chore Visual Calendar Modal */}
+      <TaskCalendarModal
+        visible={Boolean(calendarTask)}
+        task={calendarTask}
+        onClose={() => setCalendarTask(null)}
       />
     </View>
   );

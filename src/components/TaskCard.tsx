@@ -10,6 +10,7 @@ interface TaskCardProps {
   task: Task;
   onStartTimer?: (task: Task) => void;
   onEdit?: (task: Task) => void;
+  onOpenCalendar?: (task: Task) => void;
 }
 
 function formatTaskDate(dateStr?: string): string {
@@ -29,7 +30,7 @@ function formatTaskDate(dateStr?: string): string {
   return dateStr;
 }
 
-export const TaskCard: React.FC<TaskCardProps> = ({ task, onStartTimer, onEdit }) => {
+export const TaskCard: React.FC<TaskCardProps> = ({ task, onStartTimer, onEdit, onOpenCalendar }) => {
   const { theme } = useThemeStore();
   const { toggleTask, deferTask, deleteTask } = useTaskStore();
 
@@ -181,11 +182,37 @@ export const TaskCard: React.FC<TaskCardProps> = ({ task, onStartTimer, onEdit }
           <EnergyBadge level={task.energyLevel} />
 
           {task.isRecurringChore && task.choreCadence && (
-            <View style={[styles.choreBadge, { backgroundColor: theme.colors.accentLight }]}>
+            <TouchableOpacity
+              style={[styles.choreBadge, { backgroundColor: theme.colors.accentLight }]}
+              onPress={() => onOpenCalendar && onOpenCalendar(task)}
+              activeOpacity={0.7}
+            >
               <Text style={[styles.choreText, { color: theme.colors.accent }]}>
                 🧹 {task.choreCadence.replace('_', '-')}
               </Text>
-            </View>
+            </TouchableOpacity>
+          )}
+
+          {onOpenCalendar && (
+            <TouchableOpacity
+              style={[
+                styles.calendarTrackerBtn,
+                {
+                  backgroundColor: theme.colors.cardBackgroundElevated,
+                  borderColor: theme.colors.cardBorder,
+                },
+              ]}
+              onPress={() => {
+                notificationEngine.triggerHaptic('light');
+                onOpenCalendar(task);
+              }}
+              activeOpacity={0.7}
+              hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+            >
+              <Text style={[styles.calendarTrackerText, { color: theme.colors.accent }]}>
+                📅 Tracker
+              </Text>
+            </TouchableOpacity>
           )}
 
           {isTodayBirthday && (
@@ -407,5 +434,15 @@ const styles = StyleSheet.create({
   deferText: {
     fontSize: 10,
     fontWeight: '600',
+  },
+  calendarTrackerBtn: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+    borderWidth: 1,
+  },
+  calendarTrackerText: {
+    fontSize: 11,
+    fontWeight: '700',
   },
 });

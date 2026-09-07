@@ -42,6 +42,24 @@ export async function initializeDatabase(): Promise<void> {
       // Column already exists
     }
 
+    // Safe table migration for task_completions
+    try {
+      await db.execAsync(`
+        CREATE TABLE IF NOT EXISTS task_completions (
+          id TEXT PRIMARY KEY,
+          task_id TEXT NOT NULL,
+          completed_date TEXT NOT NULL,
+          created_at TEXT NOT NULL,
+          FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE CASCADE
+        );
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_task_completions_unique ON task_completions(task_id, completed_date);
+        CREATE INDEX IF NOT EXISTS idx_task_completions_task_id ON task_completions(task_id);
+        CREATE INDEX IF NOT EXISTS idx_task_completions_date ON task_completions(completed_date);
+      `);
+    } catch {
+      // Table already exists
+    }
+
     // Seed initial starter items if fresh database
     await db.execAsync(SEED_DATA_SQL);
     
@@ -55,6 +73,7 @@ export async function initializeDatabase(): Promise<void> {
 export async function clearAllData(): Promise<void> {
   const db = await getDatabase();
   await db.execAsync(`
+    DELETE FROM task_completions;
     DELETE FROM habit_logs;
     DELETE FROM habits;
     DELETE FROM tasks;
