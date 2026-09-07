@@ -103,7 +103,20 @@ CREATE TABLE IF NOT EXISTS reminder_rules (
 
 CREATE INDEX IF NOT EXISTS idx_reminder_rules_active ON reminder_rules(is_active);
 
--- 7. App Settings Key-Value Table
+-- 7. Task & Chore Completion Logs (Calendar Day Tracker)
+CREATE TABLE IF NOT EXISTS task_completions (
+  id TEXT PRIMARY KEY,
+  task_id TEXT NOT NULL,
+  completed_date TEXT NOT NULL, -- YYYY-MM-DD
+  created_at TEXT NOT NULL,
+  FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE CASCADE
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_task_completions_unique ON task_completions(task_id, completed_date);
+CREATE INDEX IF NOT EXISTS idx_task_completions_task_id ON task_completions(task_id);
+CREATE INDEX IF NOT EXISTS idx_task_completions_date ON task_completions(completed_date);
+
+-- 8. App Settings Key-Value Table
 CREATE TABLE IF NOT EXISTS app_settings (
   key TEXT PRIMARY KEY,
   value TEXT NOT NULL,

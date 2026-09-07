@@ -23,6 +23,20 @@ export interface Task {
   completedAt?: string;
 }
 
+export interface TaskCompletion {
+  id: string;
+  taskId: string;
+  completedDate: string; // YYYY-MM-DD
+  createdAt: string;
+}
+
+export interface TaskStreakStats {
+  currentStreak: number;
+  bestStreak: number;
+  totalCompletions: number;
+  completionDates: string[]; // YYYY-MM-DD
+}
+
 export type HabitTier = 'mini' | 'standard' | 'plus';
 
 export interface Habit {

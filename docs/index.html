@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Privacy Policy - Efficient Me</title>
+  <style>
+    :root {
+      --bg: #090D16;
+      --card-bg: #111827;
+      --text: #F3F4F6;
+      --text-muted: #9CA3AF;
+      --accent: #6366F1;
+      --border: #1F2937;
+    }
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+      background-color: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+      padding: 40px 20px;
+    }
+    .container {
+      max-width: 780px;
+      margin: 0 auto;
+      background-color: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 36px 32px;
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.4);
+    }
+    .header {
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 24px;
+      margin-bottom: 28px;
+    }
+    h1 {
+      font-size: 2rem;
+      color: #FFFFFF;
+      margin-bottom: 8px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .badge {
+      display: inline-block;
+      background: rgba(99, 102, 241, 0.2);
+      color: #A5B4FC;
+      border: 1px solid rgba(99, 102, 241, 0.4);
+      padding: 4px 12px;
+      border-radius: 9999px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      margin-top: 6px;
+    }
+    .date {
+      color: var(--text-muted);
+      font-size: 0.9rem;
+      margin-top: 10px;
+    }
+    h2 {
+      font-size: 1.25rem;
+      color: #E5E7EB;
+      margin-top: 24px;
+      margin-bottom: 12px;
+      border-left: 4px solid var(--accent);
+      padding-left: 10px;
+    }
+    p {
+      margin-bottom: 14px;
+      color: #D1D5DB;
+    }
+    ul {
+      margin-left: 24px;
+      margin-bottom: 16px;
+      color: #D1D5DB;
+    }
+    li {
+      margin-bottom: 6px;
+    }
+    .highlight-box {
+      background: rgba(99, 102, 241, 0.08);
+      border: 1px solid rgba(99, 102, 241, 0.25);
+      border-radius: 10px;
+      padding: 16px 20px;
+      margin: 20px 0;
+    }
+    .highlight-box strong {
+      color: #A5B4FC;
+    }
+    footer {
+      text-align: center;
+      margin-top: 36px;
+      color: var(--text-muted);
+      font-size: 0.85rem;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>⚡ Efficient Me</h1>
+      <span class="badge">100% Local-First &amp; Zero-Telemetry</span>
+      <div class="date">Last Updated: August 27, 2026</div>
+    </div>
+
+    <div class="highlight-box">
+      <strong>Core Privacy Commitment:</strong> Efficient Me ("we", "our", or "the app") is built from the ground up with a <strong>Zero-Cloud, 100% Local-First Data Sovereignty</strong> architecture. Your productivity, personal habits, energy scores, and daily tasks are private to you and never leave your physical device.
+    </div>
+
+    <h2>1. Information We Collect</h2>
+    <p><strong>None.</strong> Efficient Me does not collect, transmit, store, or sell any personal information, behavioral analytics, location data, or device identifiers to external servers or third parties.</p>
+
+    <h2>2. On-Device Local Data Storage</h2>
+    <p>All data you input—including:</p>
+    <ul>
+      <li>Tasks, periodic chores, and priority deadlines</li>
+      <li>Daily energy and mood ratings</li>
+      <li>Elastic habit streak logs</li>
+      <li>Long-term OKR milestone goals</li>
+      <li>Circadian chronotype preferences</li>
+    </ul>
+    <p>is stored strictly in an encrypted local <strong>SQLite database</strong> housed inside your device's isolated application sandbox.</p>
+
+    <h2>3. Backups &amp; Portability</h2>
+    <p>You can create <strong>AES-256 encrypted backups</strong> protected by your personal passphrase. Exported JSON and CSV files remain completely under your control and are saved directly to your device storage or shared via your system share sheet.</p>
+
+    <h2>4. Device Permissions Used</h2>
+    <p>Efficient Me requests only the minimal device permissions required for core functionality:</p>
+    <ul>
+      <li><code>POST_NOTIFICATIONS</code>: To deliver local task reminders, circadian peak check-in notifications, and habit reminders on your device.</li>
+      <li><code>VIBRATE</code>: To provide haptic feedback during focus sprints, somatic breathwork pacing, and button interactions.</li>
+      <li><code>SCHEDULE_EXACT_ALARM</code> / <code>RECEIVE_BOOT_COMPLETED</code>: To restore your local reminder schedules if your device restarts.</li>
+    </ul>
+
+    <h2>5. Third-Party Services &amp; SDKs</h2>
+    <p>Efficient Me contains:</p>
+    <ul>
+      <li><strong>0 Tracking SDKs</strong> (No Google Analytics, Firebase Analytics, or Facebook Pixel)</li>
+      <li><strong>0 Advertising SDKs</strong> (No AdMob, Unity Ads, or programmatic ad networks)</li>
+      <li><strong>0 Cloud Database Connections</strong> (No user accounts or cloud syncing)</li>
+    </ul>
+
+    <h2>6. Children's Privacy</h2>
+    <p>Because Efficient Me collects zero personal data, it does not collect information from children or any other user demographic.</p>
+
+    <h2>7. Data Erasure &amp; Factory Reset</h2>
+    <p>You maintain 100% control over your data at all times. You can permanently erase all tasks, habits, and history at any moment by navigating to: <strong>⚙️ Settings &rarr; Erase All Local Data</strong>.</p>
+
+    <h2>8. Contact</h2>
+    <p>If you have questions regarding this Privacy Policy, you may contact the developer via GitHub repository issues at <a href="https://github.com/RajeevKumarSinha/efficient-me" style="color:#818CF8;">github.com/RajeevKumarSinha/efficient-me</a>.</p>
+  </div>
+  <footer>
+    &copy; 2026 Efficient Me. All rights reserved. Built with local-first privacy.
+  </footer>
+</body>
+</html>

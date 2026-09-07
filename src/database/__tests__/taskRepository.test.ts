@@ -97,4 +97,60 @@ describe('Task Repository (SQLite WAL Database Layer)', () => {
     const chores = await taskRepository.getPeriodicChores();
     expect(chores.some((c) => c.title === 'Deep Clean Fridge')).toBe(true);
   });
+
+  it('should advance due date and track completions when daily recurring task is completed', async () => {
+    const todayStr = new Date().toISOString().split('T')[0];
+    const dailyTask = await taskRepository.createTask({
+      title: 'Daily Sunlight & Water',
+      energyLevel: 1,
+      priority: 'P2',
+      status: 'pending',
+      dueDate: todayStr,
+      isRecurringChore: true,
+      choreCadence: 'daily',
+      isEscalatingBirthday: false,
+    });
+
+    // Complete the daily task for today
+    await taskRepository.completeTask(dailyTask.id);
+
+    // Verify completion log exists for today
+    const completions = await taskRepository.getTaskCompletions(dailyTask.id);
+    expect(completions).toContain(todayStr);
+
+    // Verify task due date advanced to tomorrow
+    const all = await taskRepository.getAllTasks();
+    const updated = all.find((t) => t.id === dailyTask.id);
+    expect(updated).toBeDefined();
+    expect(updated?.dueDate).not.toBe(todayStr);
+    expect(updated?.status).toBe('pending');
+  });
+
+  it('should calculate task calendar streak stats correctly', async () => {
+    const task = await taskRepository.createTask({
+      title: 'Daily Journaling & Reading',
+      energyLevel: 1,
+      priority: 'P3',
+      status: 'pending',
+      isRecurringChore: true,
+      choreCadence: 'daily',
+    });
+
+    const today = new Date();
+    const todayStr = today.toISOString().split('T')[0];
+    
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+    const yesterdayStr = yesterday.toISOString().split('T')[0];
+
+    // Mark completed for today and yesterday
+    await taskRepository.toggleTaskCompletionDate(task.id, todayStr);
+    await taskRepository.toggleTaskCompletionDate(task.id, yesterdayStr);
+
+    const stats = await taskRepository.getTaskStreakStats(task.id);
+    expect(stats.currentStreak).toBe(2);
+    expect(stats.bestStreak).toBe(2);
+    expect(stats.totalCompletions).toBe(2);
+    expect(stats.completionDates).toEqual([todayStr, yesterdayStr].sort());
+  });
 });

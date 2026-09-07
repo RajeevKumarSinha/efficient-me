@@ -16,6 +16,7 @@ import { TaskCard } from '../components/TaskCard';
 import { FocusTimerModal } from '../components/FocusTimerModal';
 import { ScheduleOptimizerModal } from '../components/ScheduleOptimizerModal';
 import { QuickCaptureModal } from '../components/QuickCaptureModal';
+import { TaskCalendarModal } from '../components/TaskCalendarModal';
 import { Task, EnergyLevel, Priority } from '../types';
 import { notificationEngine } from '../services/notifications/notificationEngine';
 import { parseNaturalLanguageTask } from '../services/ai/naturalLanguageParser';
@@ -39,6 +40,7 @@ export const TasksScreen: React.FC = () => {
   const [optimizerVisible, setOptimizerVisible] = useState(false);
   const [quickCaptureVisible, setQuickCaptureVisible] = useState(false);
   const [selectedTaskForTimer, setSelectedTaskForTimer] = useState<Task | null>(null);
+  const [calendarModalTask, setCalendarModalTask] = useState<Task | null>(null);
 
   // New task form state
   const [title, setTitle] = useState('');
@@ -457,6 +459,9 @@ export const TasksScreen: React.FC = () => {
               onStartTimer={(t) => {
                 setSelectedTaskForTimer(t);
                 setFocusTimerVisible(true);
+              }}
+              onOpenCalendar={(t) => {
+                setCalendarModalTask(t);
               }}
               onEdit={handleOpenEdit}
             />
@@ -1144,6 +1149,13 @@ export const TasksScreen: React.FC = () => {
       <QuickCaptureModal
         visible={quickCaptureVisible}
         onClose={() => setQuickCaptureVisible(false)}
+      />
+
+      {/* Task Calendar & Consistency Day Crosser Modal */}
+      <TaskCalendarModal
+        visible={Boolean(calendarModalTask)}
+        task={calendarModalTask}
+        onClose={() => setCalendarModalTask(null)}
       />
     </View>
   );

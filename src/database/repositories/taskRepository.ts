@@ -22,6 +22,40 @@ function rowToTask(row: any): Task {
   };
 }
 
+export function calculateNextDueDate(currentDueDate?: string, cadence?: string): string {
+  const baseDate = currentDueDate ? new Date(currentDueDate + 'T00:00:00') : new Date();
+  const nextDate = new Date(baseDate);
+
+  switch (cadence) {
+    case 'daily':
+      nextDate.setDate(nextDate.getDate() + 1);
+      break;
+    case 'weekly':
+      nextDate.setDate(nextDate.getDate() + 7);
+      break;
+    case 'monthly':
+      nextDate.setMonth(nextDate.getMonth() + 1);
+      break;
+    case '3_month':
+      nextDate.setMonth(nextDate.getMonth() + 3);
+      break;
+    case '6_month':
+      nextDate.setMonth(nextDate.getMonth() + 6);
+      break;
+    case 'yearly':
+      nextDate.setFullYear(nextDate.getFullYear() + 1);
+      break;
+    default:
+      nextDate.setDate(nextDate.getDate() + 1);
+      break;
+  }
+
+  const y = nextDate.getFullYear();
+  const m = String(nextDate.getMonth() + 1).padStart(2, '0');
+  const d = String(nextDate.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
 export const taskRepository = {
   async getAllTasks(): Promise<Task[]> {
     const db = await getDatabase();
@@ -106,23 +140,200 @@ export const taskRepository = {
   async completeTask(id: string): Promise<void> {
     const db = await getDatabase();
     const now = new Date().toISOString();
+    const today = now.split('T')[0];
+
+    const taskRow = await db.getFirstAsync<any>(`SELECT * FROM tasks WHERE id = ?`, [id]);
+    if (!taskRow) return;
+
+    // Log completion in task_completions
+    const completionId = 'tc_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7);
     await db.runAsync(
-      `UPDATE tasks SET status = 'completed', completed_at = ?, updated_at = ? WHERE id = ?`,
-      [now, now, id]
+      `INSERT OR REPLACE INTO task_completions (id, task_id, completed_date, created_at)
+       VALUES (?, ?, ?, ?)`,
+      [completionId, id, today, now]
     );
+
+    if (taskRow.is_recurring_chore && taskRow.chore_cadence) {
+      const nextDue = calculateNextDueDate(today, taskRow.chore_cadence);
+      await db.runAsync(
+        `UPDATE tasks SET status = 'pending', due_date = ?, completed_at = ?, updated_at = ? WHERE id = ?`,
+        [nextDue, now, now, id]
+      );
+    } else {
+      await db.runAsync(
+        `UPDATE tasks SET status = 'completed', completed_at = ?, updated_at = ? WHERE id = ?`,
+        [now, now, id]
+      );
+    }
   },
 
   async toggleTaskStatus(id: string, currentStatus: TaskStatus): Promise<TaskStatus> {
-    const nextStatus: TaskStatus = currentStatus === 'completed' ? 'pending' : 'completed';
     const db = await getDatabase();
     const now = new Date().toISOString();
-    const completedAt = nextStatus === 'completed' ? now : null;
+    const today = now.split('T')[0];
 
-    await db.runAsync(
-      `UPDATE tasks SET status = ?, completed_at = ?, updated_at = ? WHERE id = ?`,
-      [nextStatus, completedAt, now, id]
+    const taskRow = await db.getFirstAsync<any>(`SELECT * FROM tasks WHERE id = ?`, [id]);
+    if (!taskRow) return 'pending';
+
+    const isRecurring = Boolean(taskRow.is_recurring_chore);
+    const cadence = taskRow.chore_cadence;
+
+    // Check if already completed today in task_completions
+    const existingCompletion = await db.getFirstAsync<any>(
+      `SELECT * FROM task_completions WHERE task_id = ? AND completed_date = ?`,
+      [id, today]
     );
-    return nextStatus;
+
+    if (isRecurring && cadence) {
+      if (existingCompletion) {
+        // Untoggle today's completion
+        await db.runAsync(`DELETE FROM task_completions WHERE task_id = ? AND completed_date = ?`, [id, today]);
+        await db.runAsync(
+          `UPDATE tasks SET status = 'pending', due_date = ?, completed_at = NULL, updated_at = ? WHERE id = ?`,
+          [today, now, id]
+        );
+        return 'pending';
+      } else {
+        // Complete for today & advance due date for next cycle
+        const completionId = 'tc_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7);
+        await db.runAsync(
+          `INSERT OR REPLACE INTO task_completions (id, task_id, completed_date, created_at)
+           VALUES (?, ?, ?, ?)`,
+          [completionId, id, today, now]
+        );
+        const nextDue = calculateNextDueDate(today, cadence);
+        await db.runAsync(
+          `UPDATE tasks SET status = 'pending', due_date = ?, completed_at = ?, updated_at = ? WHERE id = ?`,
+          [nextDue, now, now, id]
+        );
+        return 'completed';
+      }
+    } else {
+      // Standard non-recurring task
+      const nextStatus: TaskStatus = currentStatus === 'completed' ? 'pending' : 'completed';
+      const completedAt = nextStatus === 'completed' ? now : null;
+
+      if (nextStatus === 'completed') {
+        const completionId = 'tc_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7);
+        await db.runAsync(
+          `INSERT OR REPLACE INTO task_completions (id, task_id, completed_date, created_at)
+           VALUES (?, ?, ?, ?)`,
+          [completionId, id, today, now]
+        );
+      } else {
+        await db.runAsync(`DELETE FROM task_completions WHERE task_id = ? AND completed_date = ?`, [id, today]);
+      }
+
+      await db.runAsync(
+        `UPDATE tasks SET status = ?, completed_at = ?, updated_at = ? WHERE id = ?`,
+        [nextStatus, completedAt, now, id]
+      );
+      return nextStatus;
+    }
+  },
+
+  async getTaskCompletions(taskId: string): Promise<string[]> {
+    const db = await getDatabase();
+    const rows = await db.getAllAsync<{ completed_date: string }>(
+      `SELECT completed_date FROM task_completions WHERE task_id = ? ORDER BY completed_date ASC`,
+      [taskId]
+    );
+    return rows.map((r) => r.completed_date);
+  },
+
+  async toggleTaskCompletionDate(taskId: string, dateStr: string): Promise<boolean> {
+    const db = await getDatabase();
+    const now = new Date().toISOString();
+    const existing = await db.getFirstAsync<any>(
+      `SELECT id FROM task_completions WHERE task_id = ? AND completed_date = ?`,
+      [taskId, dateStr]
+    );
+
+    if (existing) {
+      await db.runAsync(`DELETE FROM task_completions WHERE task_id = ? AND completed_date = ?`, [taskId, dateStr]);
+      return false;
+    } else {
+      const completionId = 'tc_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7);
+      await db.runAsync(
+        `INSERT INTO task_completions (id, task_id, completed_date, created_at) VALUES (?, ?, ?, ?)`,
+        [completionId, taskId, dateStr, now]
+      );
+      return true;
+    }
+  },
+
+  async getTaskStreakStats(taskId: string): Promise<{ currentStreak: number; bestStreak: number; totalCompletions: number; completionDates: string[] }> {
+    const db = await getDatabase();
+    const rows = await db.getAllAsync<{ completed_date: string }>(
+      `SELECT completed_date FROM task_completions WHERE task_id = ? ORDER BY completed_date ASC`,
+      [taskId]
+    );
+
+    const dates = rows.map((r) => r.completed_date);
+    if (dates.length === 0) {
+      return { currentStreak: 0, bestStreak: 0, totalCompletions: 0, completionDates: [] };
+    }
+
+    const dateSet = new Set(dates);
+    const today = new Date();
+
+    // Compute current streak
+    let currentStreak = 0;
+    const checkDate = new Date(today);
+    
+    // Check if completed today or yesterday to start streak
+    const checkTodayStr = checkDate.toISOString().split('T')[0];
+    if (dateSet.has(checkTodayStr)) {
+      currentStreak++;
+      checkDate.setDate(checkDate.getDate() - 1);
+    } else {
+      checkDate.setDate(checkDate.getDate() - 1);
+      const checkYesterdayStr = checkDate.toISOString().split('T')[0];
+      if (dateSet.has(checkYesterdayStr)) {
+        currentStreak++;
+        checkDate.setDate(checkDate.getDate() - 1);
+      }
+    }
+
+    while (currentStreak > 0) {
+      const dStr = checkDate.toISOString().split('T')[0];
+      if (dateSet.has(dStr)) {
+        currentStreak++;
+        checkDate.setDate(checkDate.getDate() - 1);
+      } else {
+        break;
+      }
+    }
+
+    // Compute best streak
+    let bestStreak = 0;
+    let tempStreak = 0;
+    const sortedUniqueDates = Array.from(dateSet).sort();
+
+    for (let i = 0; i < sortedUniqueDates.length; i++) {
+      if (i === 0) {
+        tempStreak = 1;
+      } else {
+        const prev = new Date(sortedUniqueDates[i - 1] + 'T00:00:00');
+        const curr = new Date(sortedUniqueDates[i] + 'T00:00:00');
+        const diffDays = Math.round((curr.getTime() - prev.getTime()) / (1000 * 60 * 60 * 24));
+        if (diffDays === 1) {
+          tempStreak++;
+        } else {
+          tempStreak = 1;
+        }
+      }
+      if (tempStreak > bestStreak) {
+        bestStreak = tempStreak;
+      }
+    }
+
+    return {
+      currentStreak,
+      bestStreak: Math.max(bestStreak, currentStreak),
+      totalCompletions: sortedUniqueDates.length,
+      completionDates: sortedUniqueDates,
+    };
   },
 
   async deferTask(id: string, newDueDate: string): Promise<void> {
